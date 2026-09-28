@@ -5,6 +5,7 @@ services:
     plan: starter
     buildCommand: pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm start
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production

@@ -9,8 +9,12 @@ Institutional web platform for **ICX POWER SOLUTIONS SRL** (Romania), built on t
 - Built-in Manus OAuth session flow with `/connexion`, `/inscription`, `/mon-espace`, and an admin-oriented `/admin` console surface.
 - Light / dark theme toggle, six-language selector (French, English, Chinese, Romanian, Polish, Arabic), and RTL direction for Arabic.
 - Domain tables in `drizzle/schema.ts` for universities, programs, service requests, application cases, and audit logs.
-- Render and Netlify deployment templates.
+- Render and Netlify deployment templates, including a fast `/healthz` readiness endpoint and direct `PORT` binding.
 - Clearly flagged placeholders for CUI, Nr. Reg. Com., company address, and partner legal data that must be confirmed before production publication.
+
+## Render deployment notes
+
+The production server binds directly to Render's `PORT` on `0.0.0.0` and exposes `/healthz` before optional integrations. This removes the previous port scan and lets Render mark the service ready as soon as the HTTP process is listening. Render still needs valid environment variables and a non-sleeping plan for consistently fast first response times.
 
 ## Local development
 

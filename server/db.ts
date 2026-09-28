@@ -55,7 +55,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
+    } else if (user.openId === ENV.ownerOpenId || user.email?.toLowerCase() === ENV.superAdminEmail) {
       values.role = 'admin';
       updateSet.role = 'admin';
     }
@@ -75,6 +75,20 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
   }
+}
+
+export async function listUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: users.id, openId: users.openId, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn }).from(users).orderBy(desc(users.createdAt));
+}
+
+export async function setUserRoleByEmail(email: string, role: "user" | "admin") {
+  if (email.toLowerCase() === ENV.superAdminEmail && role !== "admin") throw new Error("The super-admin account cannot be demoted");
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ role }).where(eq(users.email, email));
+  return { success: true } as const;
 }
 
 export async function getUserByOpenId(openId: string) {

@@ -2,6 +2,7 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { ENV } from "./env";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -41,5 +42,15 @@ export const adminProcedure = t.procedure.use(
         user: ctx.user,
       },
     });
+  }),
+);
+
+
+export const superAdminProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    const isSuperAdmin = Boolean(ctx.user && (ctx.user.email?.toLowerCase() === ENV.superAdminEmail || ctx.user.openId === ENV.ownerOpenId));
+    if (!isSuperAdmin) throw new TRPCError({ code: "FORBIDDEN", message: "Super-administrator access required" });
+    return next({ ctx: { ...ctx, user: ctx.user } });
   }),
 );

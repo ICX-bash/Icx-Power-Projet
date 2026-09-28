@@ -59,3 +59,10 @@ The first migration is in `drizzle/0001_aberrant_justin_hammer.sql`. The tables 
 | `/mon-espace` | Protected client workspace surface |
 | `/admin` | Operations dashboard surface |
 | `/confidentialite` / `/mentions-legales` | Legal placeholders |
+## Administration and langues
+
+- Le compte `icxps.sale@outlook.com` est le **super-administrateur** par défaut.
+- Pour remplacer cette adresse en production, définir `SUPER_ADMIN_EMAIL`.
+- Le super-administrateur peut promouvoir ou révoquer les comptes existants depuis `/admin` ; son propre rôle ne peut pas être rétrogradé.
+- Le registre global des langues est centralisé dans `client/src/lib/i18n.ts` et couvre `fr`, `en`, `ro`, `pl`, `ar` et `zh`. Le choix est mémorisé et l’arabe active automatiquement le mode RTL.
+

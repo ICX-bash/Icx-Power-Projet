@@ -1,11 +1,11 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router, superAdminProcedure } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
 import { notifyOwner } from "./_core/notification";
 import { z } from "zod";
-import { addServiceDocument, createPartnershipRequest, createServiceRequest, createUserNotification, getPartnershipRequestsForUser, getServiceDocumentsForUser, getServiceRequestById, getServiceRequestsForUser, getUserNotifications, getWorkflowProgressForUser, saveWorkflowProgress, updateServiceRequestStatus } from "./db";
+import { addServiceDocument, createPartnershipRequest, createServiceRequest, createUserNotification, getPartnershipRequestsForUser, getServiceDocumentsForUser, getServiceRequestById, getServiceRequestsForUser, getUserNotifications, getWorkflowProgressForUser, saveWorkflowProgress, updateServiceRequestStatus, listUsers, setUserRoleByEmail } from "./db";
 import { storagePut } from "./storage";
 
 const icxKnowledgeBase = `Contexte de référence ICX POWER SOLUTIONS SRL : société roumaine basée à Iași, CUI 54675848, Nr. Reg. Com. J2026031336000, CAEN 7020. Services : Expertise internationale, Conseil en entreprise, Sourcing, Ressources humaines, Commerce international, Études & admissions et Immobilier. Parcours portail : chaque sous-service permet de préciser le besoin, répondre à une évaluation courte, puis ouvrir un espace sécurisé pour enregistrer une demande et joindre des documents. Tarification : les prestations sont étudiées sur brief et devis ; ne donne jamais de prix inventé. Documents de départ généralement utiles : identité/passeport, coordonnées, contexte du projet, budget ou calendrier, justificatifs spécifiques au service. Pour les études : le catalogue présente des informations indicatives et la disponibilité, les frais, visas et admissions doivent être confirmés auprès de l’établissement. Pour une entreprise partenaire : demander raison sociale, interlocuteur, email, besoin, pays concernés et objectif de coopération. Ne présente jamais ce contexte comme un contrat, une garantie ou un avis juridique.`;
@@ -85,6 +85,11 @@ export const appRouter = router({
 
   notifications: router({
     mine: protectedProcedure.query(({ ctx }) => getUserNotifications(ctx.user.id)),
+  }),
+
+  admin: router({
+    users: superAdminProcedure.query(() => listUsers()),
+    setRole: superAdminProcedure.input(z.object({ email: z.string().email(), role: z.enum(["user", "admin"]) })).mutation(({ input }) => setUserRoleByEmail(input.email.toLowerCase(), input.role)),
   }),
 
   ai: router({

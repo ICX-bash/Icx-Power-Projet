@@ -126,6 +126,19 @@
   .noise::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .045; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E"); mix-blend-mode: soft-light; }
   .rise-in { animation: rise-in .55s cubic-bezier(.23,1,.32,1) both; }
   .assistant-bubble { animation: assistant-float 4s ease-in-out infinite; }
+  /* Compact institutional rhythm: keep dense workflows readable on every route. */
+  main [class~="py-28"] { padding-block: 4.5rem !important; }
+  main [class~="py-24"] { padding-block: 4rem !important; }
+  main [class~="py-20"] { padding-block: 3.5rem !important; }
+  main [class~="py-16"] { padding-block: 3rem !important; }
+  main [class~="py-14"] { padding-block: 2.5rem !important; }
+  main [class~="py-12"] { padding-block: 2.25rem !important; }
+  main [class~="gap-12"] { gap: 2rem !important; }
+  main [class~="mt-12"] { margin-top: 2rem !important; }
+  main [class~="mt-10"] { margin-top: 1.75rem !important; }
+  main [class~="mt-9"] { margin-top: 1.5rem !important; }
+  main [class~="mt-8"] { margin-top: 1.25rem !important; }
+  main [class~="leading-6"], main [class~="leading-7"], main [class~="leading-8"] { text-align: justify; text-wrap: pretty; }
 }
 
 @keyframes assistant-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }

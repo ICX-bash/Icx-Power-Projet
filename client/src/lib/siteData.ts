@@ -161,5 +161,9 @@ export const serviceTranslations: Record<Locale, Record<string, { label: string;
 
 // Every locale has a non-French service surface; locales still being expanded use
 // the complete English service vocabulary rather than silently reverting to French.
-if (Object.keys(serviceTranslations.pl).length === 0) serviceTranslations.pl = serviceTranslations.en;
-if (Object.keys(serviceTranslations.ar).length === 0) serviceTranslations.ar = serviceTranslations.en;
+for (const locale of Object.keys(serviceTranslations) as Locale[]) {
+  if (locale === "fr") continue;
+  for (const slug of Object.keys(serviceTranslations.en)) {
+    if (!serviceTranslations[locale][slug]) serviceTranslations[locale][slug] = serviceTranslations.en[slug];
+  }
+}

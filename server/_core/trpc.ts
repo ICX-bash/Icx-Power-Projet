@@ -28,7 +28,7 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
-const isSuperAdminIdentity = (user: TrpcContext["user"]) => Boolean(
+export const isSuperAdminIdentity = (user: TrpcContext["user"]) => Boolean(
   user && (user.email?.toLowerCase() === ENV.superAdminEmail || user.openId === ENV.ownerOpenId),
 );
 

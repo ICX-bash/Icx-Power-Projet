@@ -36,6 +36,13 @@
       "when": 1790505544344,
       "tag": "0004_free_mother_askani",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1790607284114,
+      "tag": "0005_create_users_table",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,8 @@ services:
         sync: false
       - key: OAUTH_SERVER_URL
         sync: false
+      - key: OWNER_OPEN_ID
+        sync: false
       - key: VITE_OAUTH_PORTAL_URL
         sync: false
       - key: SMTP_HOST
@@ -29,7 +31,7 @@ services:
         sync: false
       - key: STORAGE_BUCKET
         sync: false
-      - key: ADMIN_EMAIL
+      - key: SUPER_ADMIN_EMAIL
         value: icxps.sale@outlook.com
 
 databases:

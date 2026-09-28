@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, partnershipRequests, serviceDocuments, serviceRequests, userNotifications, users, workflowProgress } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -41,7 +41,9 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const assignNullable = (field: TextField) => {
       const value = user[field];
       if (value === undefined) return;
-      const normalized = value ?? null;
+      const normalized = field === "email" && typeof value === "string"
+        ? value.trim().toLowerCase()
+        : value ?? null;
       values[field] = normalized;
       updateSet[field] = normalized;
     };
@@ -52,7 +54,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
-    const isPrincipal = user.openId === ENV.ownerOpenId || user.email?.toLowerCase() === ENV.superAdminEmail;
+    const isPrincipal = user.openId === ENV.ownerOpenId || user.email?.trim().toLowerCase() === ENV.superAdminEmail;
     if (isPrincipal) {
       // The configured principal cannot be downgraded by a stale identity-provider role.
       values.role = "admin";
@@ -82,14 +84,23 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function listUsers() {
   const db = await getDb();
   if (!db) return [];
-  return db.select({ id: users.id, openId: users.openId, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn }).from(users).orderBy(desc(users.createdAt));
+  const rows = await db.select({ id: users.id, openId: users.openId, name: users.name, email: users.email, role: users.role, createdAt: users.createdAt, lastSignedIn: users.lastSignedIn }).from(users).orderBy(desc(users.createdAt));
+  return rows.map(account => ({
+    ...account,
+    isProtectedPrincipal: account.openId === ENV.ownerOpenId || account.email?.toLowerCase() === ENV.superAdminEmail,
+  }));
 }
 
 export async function setUserRoleByEmail(email: string, role: "user" | "admin") {
-  if (email.toLowerCase() === ENV.superAdminEmail && role !== "admin") throw new Error("The super-admin account cannot be demoted");
+  const normalizedEmail = email.trim().toLowerCase();
+  if (normalizedEmail === ENV.superAdminEmail && role !== "admin") throw new Error("The super-admin account cannot be demoted");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  await db.update(users).set({ role }).where(eq(users.email, email));
+  const target = await db.select({ openId: users.openId }).from(users)
+    .where(sql`LOWER(${users.email}) = ${normalizedEmail}`).limit(1);
+  if (!target[0]) throw new Error("No account found with that email");
+  if (target[0].openId === ENV.ownerOpenId && role !== "admin") throw new Error("The owner account cannot be demoted");
+  await db.update(users).set({ role }).where(sql`LOWER(${users.email}) = ${normalizedEmail}`);
   return { success: true } as const;
 }
 
@@ -157,6 +168,12 @@ export async function getServiceRequestsForUser(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(serviceRequests).where(eq(serviceRequests.userId, userId)).orderBy(desc(serviceRequests.updatedAt));
+}
+
+export async function getAllServiceRequests() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(serviceRequests).orderBy(desc(serviceRequests.updatedAt));
 }
 
 export async function saveWorkflowProgress(input: typeof workflowProgress.$inferInsert) {

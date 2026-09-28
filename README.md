@@ -6,7 +6,7 @@ Institutional web platform for **ICX POWER SOLUTIONS SRL** (Romania), built on t
 
 - Responsive public site with ICX visual system, six service routes, internal service tabs, and a protected-contact entry point.
 - Admissions workbench at `/etudes` with combined country / level / text filters, program detail modal, required-document checklist, and auth-gated application CTA.
-- Built-in Manus OAuth session flow with `/connexion`, `/inscription`, `/mon-espace`, and an admin-oriented `/admin` console surface.
+- Built-in Manus OAuth session flow with `/connexion`, `/inscription`, `/mon-espace`, and a visually separate `/admin` console. Login and account creation happen at the identity provider; the public site does not simulate passwords or account creation.
 - Light / dark theme toggle, six-language selector (French, English, Chinese, Romanian, Polish, Arabic), and RTL direction for Arabic.
 - Domain tables in `drizzle/schema.ts` for universities, programs, service requests, application cases, and audit logs.
 - Render and Netlify deployment templates, including a fast `/healthz` readiness endpoint and direct `PORT` binding.
@@ -37,7 +37,7 @@ The WebDev runtime injects the Manus auth, database, storage, and built-in API v
 
 ## Data model
 
-The first migration is in `drizzle/0001_aberrant_justin_hammer.sql`. The tables are intentionally relational so requests and application cases can later be connected to the authenticated user, with signed storage references and an audit trail added in the next integration pass.
+The initial migration `drizzle/0000_sleepy_mercury.sql` restores the missing users-table migration; `drizzle/0005_create_users_table.sql` safely ensures that table exists even when older migrations are already recorded. Apply migrations with `DATABASE_URL` configured using `pnpm db:push`.
 
 ## Production follow-up before publication
 
@@ -62,7 +62,8 @@ The first migration is in `drizzle/0001_aberrant_justin_hammer.sql`. The tables 
 ## Administration and langues
 
 - Le compte `icxps.sale@outlook.com` est le **super-administrateur** par défaut.
-- Pour remplacer cette adresse en production, définir `SUPER_ADMIN_EMAIL`.
-- Le super-administrateur peut promouvoir ou révoquer les comptes existants depuis `/admin` ; son propre rôle ne peut pas être rétrogradé.
+- Pour remplacer cette adresse en production, définir `SUPER_ADMIN_EMAIL` (l’ancien `ADMIN_EMAIL` reste accepté).
+- Ouvrir `/admin` puis se connecter via le fournisseur OAuth avec l’adresse super-admin. La redirection revient automatiquement dans la console après connexion.
+- La console lit les demandes enregistrées et permet de changer leur statut ; le super-administrateur peut consulter les comptes, promouvoir ou révoquer un rôle admin. Les permissions sont contrôlées côté serveur.
+- Le catalogue et le journal d’audit détaillé ne sont pas des outils actifs dans cette version ; la console l’indique au lieu d’afficher des chiffres ou actions simulés.
 - Le registre global des langues est centralisé dans `client/src/lib/i18n.ts` et couvre `fr`, `en`, `ro`, `pl`, `ar` et `zh`. Le choix est mémorisé et l’arabe active automatiquement le mode RTL.
-

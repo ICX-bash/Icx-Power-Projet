@@ -33,12 +33,14 @@ describe("requests and notifications access", () => {
   it("rejects admin operations for a regular user", async () => {
     const caller = appRouter.createCaller({ ...publicContext, user: { id: 7, openId: "regular", email: "client@example.com", name: "Client", role: "user" } as any });
     await expect(caller.admin.users()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.auth.isSuperAdmin()).resolves.toBe(false);
     await expect(caller.requests.updateStatus({ id: 1, status: "Accepté" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("recognizes the configured principal super-admin", async () => {
     const caller = appRouter.createCaller({ ...publicContext, user: { id: 1, openId: "principal", email: "ICXPS.SALE@OUTLOOK.COM", name: "ICX Principal", role: "user" } as any });
     await expect(caller.admin.users()).resolves.toEqual(expect.any(Array));
+    await expect(caller.auth.isSuperAdmin()).resolves.toBe(true);
   });
 
 });

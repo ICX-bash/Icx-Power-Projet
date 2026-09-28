@@ -1,37 +1,17 @@
-import { OAUTH_STATE_COOKIE, encodeOAuthState } from "@shared/const";
-
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Start the Manus OAuth login. Call this from an event handler or effect at the
-// moment you want to navigate, e.g. `onClick={() => startLogin()}`.
-//
-// It has SIDE EFFECTS — it mints a one-time nonce, writes the __Host- state
-// cookie, and navigates immediately — so the cookie nonce always matches the
-// `state` it sends. Do NOT call it during render (no `href={startLogin()}` /
-// `loginUrl={...}`): each call overwrites the cookie, so a stray render-phase
-// call would desync it from an in-flight login and the callback would reject it
-// with "invalid oauth state". It returns void by design, so there is no URL to
-// stash across renders.
-export const startLogin = (returnTo = "/mon-espace") => {
-  const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-  const appId = import.meta.env.VITE_APP_ID;
-  if (!oauthPortalUrl || !appId) {
-    throw new Error("Manus OAuth is not configured. Set VITE_OAUTH_PORTAL_URL and VITE_APP_ID before building.");
-  }
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
+const AUTH_PATHS = new Set(["/connexion", "/inscription", "/mot-de-passe-oublie", "/verification-email"]);
 
-  const nonce = crypto.randomUUID();
-  document.cookie = `${OAUTH_STATE_COOKIE}=${nonce}; Path=/; Max-Age=600; SameSite=None; Secure`;
-  const safeReturnTo = returnTo.startsWith("/") && !returnTo.startsWith("//") && !returnTo.includes("\\")
+/** Send an unauthenticated client to the site's own sign-in page. */
+export const startLogin = (returnTo = "/mon-espace") => {
+  if (typeof window === "undefined") return;
+  if (AUTH_PATHS.has(window.location.pathname)) return;
+
+  const safeTarget = returnTo.startsWith("/") && !returnTo.startsWith("//") && !returnTo.includes("\\") && !returnTo.startsWith("/admin") && !AUTH_PATHS.has(returnTo)
     ? returnTo
     : "/mon-espace";
-  const state = encodeOAuthState({ redirectUri, nonce, returnTo: safeReturnTo });
-
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
-
-  window.location.href = url.toString();
+  try {
+    sessionStorage.setItem("icx-auth-return-to", safeTarget);
+  } catch {}
+  window.location.assign("/connexion");
 };

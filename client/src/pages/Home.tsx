@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
+import AuthPanel from "@/pages/AuthPanel";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -473,40 +473,6 @@ const authTranslations: Record<Locale, {
   ar: { firstName: "الاسم الأول", lastName: "اسم العائلة", email: "البريد الإلكتروني", emailPlaceholder: "you@example.com", phone: "الهاتف", country: "البلد", passwordHint: "10 أحرف على الأقل", twoFactor: "المصادقة الثنائية (2FA)", twoFactorHint: "أدخل الرمز من التطبيق أو الرسالة النصية.", twoFactorCode: "رمز 2FA", twoFactorCodeHint: "123456", cookieConsent: "أوافق على استخدام ملفات الارتباط الضرورية ونسخ الاحتياط لحماية حسابي.", privacyConsent: "أوافق على سياسة الخصوصية.", gdprConsent: "أوافق على معالجة بياناتي وفق اللائحة العامة لحماية البيانات والقواعد الأوروبية.", termsConsent: "أوافق على شروط الاستخدام.", requiredNotice: "الحقول المحددة إلزامية.", loginTitle: "مرحباً بعودتك.", signupTitle: "لنبدأ الخطوة التالية.", loginSubtitle: "سجّل الدخول للوصول إلى ملفاتك.", signupSubtitle: "أنشئ مساحة لإدارة مشروعك.", noAccount: "ليس لديك حساب بعد؟", alreadyAccount: "لديك حساب بالفعل؟", secureIntro: "مساحتك للتقدم بثقة.", forgot: "هل نسيت كلمة المرور؟", remember: "تذكرني", show: "إظهار", hide: "إخفاء", mismatch: "كلمتا المرور غير متطابقتين.", missingConsent: "يرجى قبول جميع الشروط الإلزامية." },
 };
 
-function AuthPageV2({ mode, locale, setLocale, setLocation }: { mode: "login" | "signup"; locale: Locale; setLocale: (locale: Locale) => void; setLocation: (path: string) => void }) {
-  const { user, loading } = useAuth();
-  const [returnTo] = useState(() => {
-    try {
-      const target = sessionStorage.getItem("icx-auth-return-to");
-      return target && target.startsWith("/") && !target.startsWith("//") ? target : "/mon-espace";
-    } catch {
-      return "/mon-espace";
-    }
-  });
-  const labels = {
-    fr: { eyebrow: "Connexion sécurisée", title: mode === "signup" ? "Créer votre espace ICX." : "Accéder à votre espace.", body: "La connexion et la création du compte sont prises en charge par le fournisseur d’identité sécurisé de la plateforme. Aucun mot de passe n’est créé ni stocké sur cette page.", button: mode === "signup" ? "Continuer pour créer mon compte" : "Continuer avec mon compte", help: "Après la connexion, vous serez redirigé vers la page demandée.", admin: "Les accès administrateur sont attribués côté serveur après identification du compte autorisé." },
-    en: { eyebrow: "Secure sign-in", title: mode === "signup" ? "Create your ICX workspace." : "Access your workspace.", body: "Sign-in and account creation are handled by the platform’s secure identity provider. This page does not create or store passwords.", button: mode === "signup" ? "Continue to create an account" : "Continue with my account", help: "After sign-in, you will return to the requested page.", admin: "Administrator access is assigned server-side after the authorized account is identified." },
-    ro: { eyebrow: "Autentificare securizată", title: mode === "signup" ? "Creează spațiul ICX." : "Accesează spațiul tău.", body: "Autentificarea și crearea contului sunt gestionate de furnizorul securizat de identitate al platformei. Această pagină nu creează și nu stochează parole.", button: mode === "signup" ? "Continuă pentru a crea un cont" : "Continuă cu contul meu", help: "După autentificare, vei reveni la pagina solicitată.", admin: "Accesul de administrator se acordă pe server după identificarea contului autorizat." },
-    pl: { eyebrow: "Bezpieczne logowanie", title: mode === "signup" ? "Utwórz przestrzeń ICX." : "Przejdź do swojej przestrzeni.", body: "Logowanie i tworzenie konta obsługuje bezpieczny dostawca tożsamości platformy. Ta strona nie tworzy ani nie przechowuje haseł.", button: mode === "signup" ? "Kontynuuj tworzenie konta" : "Kontynuuj z moim kontem", help: "Po zalogowaniu wrócisz do żądanej strony.", admin: "Dostęp administratora jest przyznawany po stronie serwera po rozpoznaniu uprawnionego konta." },
-    ar: { eyebrow: "تسجيل دخول آمن", title: mode === "signup" ? "أنشئ مساحة ICX." : "ادخل إلى مساحتك.", body: "يتولى مزود الهوية الآمن للمنصة تسجيل الدخول وإنشاء الحساب. لا تنشئ هذه الصفحة كلمات مرور ولا تخزنها.", button: mode === "signup" ? "متابعة إنشاء الحساب" : "المتابعة بحسابي", help: "بعد تسجيل الدخول ستعود إلى الصفحة المطلوبة.", admin: "يُمنح وصول المسؤول على الخادم بعد التحقق من الحساب المصرح له." },
-    zh: { eyebrow: "安全登录", title: mode === "signup" ? "创建 ICX 空间。" : "访问您的空间。", body: "平台的安全身份提供方负责登录和账户创建。本页面不会创建或存储密码。", button: mode === "signup" ? "继续创建账户" : "使用我的账户继续", help: "登录后将返回您请求的页面。", admin: "服务器将在识别获准账户后授予管理员权限。" },
-  }[locale];
-  useEffect(() => {
-    if (user) setLocation(user.role === "admin" ? "/admin" : "/mon-espace");
-  }, [user, setLocation]);
-  const beginLogin = () => {
-    try { sessionStorage.removeItem("icx-auth-return-to"); } catch {}
-    try {
-      startLogin(returnTo);
-    } catch {
-      toast.error(locale === "fr" ? "La connexion sécurisée n’est pas configurée. Contactez l’administrateur du site." : "Secure sign-in is not configured. Contact the site administrator.");
-    }
-  };
-  if (loading || user) {
-    return <main className="grid min-h-screen place-items-center bg-[#111816] text-slate-100"><div className="text-center"><span className="mx-auto block size-8 animate-spin rounded-full border-2 border-amber-300 border-t-transparent" /><p className="mt-4 text-sm">{locale === "fr" ? "Vérification de la session…" : "Checking your session…"}</p></div></main>;
-  }
-  return <PageWrap><Header locale={locale} setLocale={setLocale} /><main className="grid min-h-[calc(100vh-74px)] place-items-center bg-[#f3f2ed] px-4 py-12 dark:bg-[#1b2420]"><Card className="w-full max-w-xl rounded-3xl p-2 shadow-xl"><CardContent className="px-6 py-10 text-center sm:px-12"><span className="mx-auto grid size-16 place-items-center rounded-3xl bg-slate-900 text-amber-300"><LockKeyhole /></span><Eyebrow>{labels.eyebrow}</Eyebrow><h1 className="mt-4 text-3xl font-semibold tracking-[-0.045em]">{labels.title}</h1><p className="mt-4 text-sm leading-6 text-muted-foreground">{labels.body}</p><Button onClick={beginLogin} className="mt-8 h-12 w-full rounded-xl">{labels.button}<ArrowRight /></Button><p className="mt-4 text-xs text-muted-foreground">{labels.help}</p><div className="mt-6 rounded-xl border border-border bg-muted/40 p-4 text-left text-xs leading-5 text-muted-foreground"><ShieldCheck className="mb-2 size-4 text-amber-600" />{labels.admin}</div><Button variant="ghost" onClick={() => setLocation("/")} className="mt-3">{locale === "fr" ? "Retour au site" : "Back to website"}</Button></CardContent></Card></main></PageWrap>;
-}
 
 
 export default function Home() {
@@ -520,8 +486,10 @@ export default function Home() {
   if (location === "/partenaires") return <InfoPage kind="partners" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
   if (location === "/confidentialite") return <InfoPage kind="privacy" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
   if (location === "/mentions-legales") return <InfoPage kind="legal" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
-  if (location === "/connexion") return <AuthPageV2 mode="login" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
-  if (location === "/inscription") return <AuthPageV2 mode="signup" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
+  if (location === "/connexion") return <AuthPanel mode="login" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
+  if (location === "/inscription") return <AuthPanel mode="signup" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
+  if (location === "/mot-de-passe-oublie") return <AuthPanel mode="forgot" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
+  if (location === "/verification-email") return <AuthPanel mode="verify" locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
   if (location === "/mon-espace") return <WorkspacePage locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
   if (location === "/admin") return <AdminPage locale={locale} setLocale={updateLocale} setLocation={setLocation} />;
   return <HomePage locale={locale} setLocale={updateLocale} setLocation={setLocation} />;

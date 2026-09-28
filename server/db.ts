@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
-import { InsertUser, auditLogs, emailLogs, integrationTokens, partnershipRequests, serviceDocuments, serviceRequests, userNotifications, users, workflowProgress } from "../drizzle/schema";
+import { InsertUser, auditLogs, clientAuthAccounts, emailLogs, integrationTokens, partnershipRequests, serviceDocuments, serviceRequests, userNotifications, users, workflowProgress } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -112,6 +112,147 @@ export async function getUserById(id: number) {
   if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return result[0];
+}
+
+export async function getClientAuthByEmail(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select().from(clientAuthAccounts).where(eq(clientAuthAccounts.email, email)).limit(1);
+  if (!rows[0]) return undefined;
+  const user = await getUserById(rows[0].userId);
+  return user ? { account: rows[0], user } : undefined;
+}
+
+export async function getClientAuthByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(clientAuthAccounts).where(eq(clientAuthAccounts.userId, userId)).limit(1);
+  return rows[0];
+}
+
+export async function createClientAuthAccount(input: {
+  email: string;
+  name: string;
+  openId: string;
+  passwordHash: string;
+  verificationTokenHash: string;
+  verificationExpiresAt: Date;
+  verificationSentAt: Date;
+  termsAcceptedAt: Date;
+  privacyAcceptedAt: Date;
+  dataProcessingAcceptedAt: Date;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async tx => {
+    const existingAuth = await tx.select().from(clientAuthAccounts).where(eq(clientAuthAccounts.email, input.email)).limit(1);
+    if (existingAuth[0]) {
+      const existingUser = await tx.select().from(users).where(eq(users.id, existingAuth[0].userId)).limit(1);
+      return { created: false, account: existingAuth[0], user: existingUser[0] };
+    }
+
+    const existingUsers = await tx.select().from(users).where(sql`LOWER(${users.email}) = ${input.email}`).limit(1);
+    let user = existingUsers[0];
+    if (!user) {
+      await tx.insert(users).values({
+        openId: input.openId,
+        name: input.name,
+        email: input.email,
+        loginMethod: "email-password",
+        role: "user",
+      });
+      const inserted = await tx.select().from(users).where(eq(users.openId, input.openId)).limit(1);
+      user = inserted[0];
+    }
+    if (!user) throw new Error("Could not create the client user");
+
+    await tx.insert(clientAuthAccounts).values({
+      userId: user.id,
+      email: input.email,
+      passwordHash: input.passwordHash,
+      verificationTokenHash: input.verificationTokenHash,
+      verificationExpiresAt: input.verificationExpiresAt,
+      verificationSentAt: input.verificationSentAt,
+      passwordChangedAt: input.verificationSentAt,
+      termsAcceptedAt: input.termsAcceptedAt,
+      privacyAcceptedAt: input.privacyAcceptedAt,
+      dataProcessingAcceptedAt: input.dataProcessingAcceptedAt,
+    });
+    return { created: true, account: undefined, user };
+  });
+}
+
+export async function updateClientVerificationToken(userId: number, tokenHash: string, expiresAt: Date, sentAt: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(clientAuthAccounts).set({ verificationTokenHash: tokenHash, verificationExpiresAt: expiresAt, verificationSentAt: sentAt }).where(eq(clientAuthAccounts.userId, userId));
+}
+
+export async function verifyClientEmailToken(tokenHash: string, now = new Date()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async tx => {
+    const rows = await tx.select().from(clientAuthAccounts).where(sql`${clientAuthAccounts.verificationTokenHash} = ${tokenHash} AND ${clientAuthAccounts.verificationExpiresAt} > ${now} AND ${clientAuthAccounts.emailVerifiedAt} IS NULL`).limit(1);
+    const account = rows[0];
+    if (!account) return undefined;
+    await tx.update(clientAuthAccounts).set({ emailVerifiedAt: now, verificationTokenHash: null, verificationExpiresAt: null }).where(eq(clientAuthAccounts.userId, account.userId));
+    const userRows = await tx.select().from(users).where(eq(users.id, account.userId)).limit(1);
+    return userRows[0];
+  });
+}
+
+export async function saveClientPasswordResetToken(userId: number, tokenHash: string, expiresAt: Date, sentAt: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(clientAuthAccounts).set({ passwordResetTokenHash: tokenHash, passwordResetExpiresAt: expiresAt, passwordResetSentAt: sentAt }).where(eq(clientAuthAccounts.userId, userId));
+}
+
+export async function resetClientPassword(tokenHash: string, passwordHash: string, now = new Date()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async tx => {
+    const rows = await tx.select().from(clientAuthAccounts).where(sql`${clientAuthAccounts.passwordResetTokenHash} = ${tokenHash} AND ${clientAuthAccounts.passwordResetExpiresAt} > ${now} AND ${clientAuthAccounts.emailVerifiedAt} IS NOT NULL`).limit(1);
+    const account = rows[0];
+    if (!account) return false;
+    await tx.update(clientAuthAccounts).set({
+      passwordHash,
+      passwordChangedAt: now,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    }).where(eq(clientAuthAccounts.userId, account.userId));
+    return true;
+  });
+}
+
+export async function recordClientLoginFailure(userId: number, now = new Date()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db.select({ failedLoginAttempts: clientAuthAccounts.failedLoginAttempts, lockedUntil: clientAuthAccounts.lockedUntil }).from(clientAuthAccounts).where(eq(clientAuthAccounts.userId, userId)).limit(1);
+  const account = rows[0];
+  if (!account) return undefined;
+  if (account.lockedUntil && account.lockedUntil > now) return account.lockedUntil;
+  const attempts = account.lockedUntil && account.lockedUntil <= now ? 1 : account.failedLoginAttempts + 1;
+  if (attempts >= 8) {
+    const lockedUntil = new Date(now.getTime() + 15 * 60 * 1000);
+    await db.update(clientAuthAccounts).set({ failedLoginAttempts: 0, lockedUntil }).where(eq(clientAuthAccounts.userId, userId));
+    return lockedUntil;
+  }
+  await db.update(clientAuthAccounts).set({ failedLoginAttempts: attempts, lockedUntil: null }).where(eq(clientAuthAccounts.userId, userId));
+  return undefined;
+}
+
+export async function clearClientLoginFailures(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(clientAuthAccounts).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(clientAuthAccounts.userId, userId));
+}
+
+export async function updateUserLastSignedIn(userId: number, signedInAt = new Date()) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ lastSignedIn: signedInAt }).where(eq(users.id, userId));
 }
 
 export async function createServiceRequest(input: typeof serviceRequests.$inferInsert) {

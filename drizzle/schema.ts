@@ -12,6 +12,27 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const clientAuthAccounts = mysqlTable("clientAuthAccounts", {
+  userId: int("userId").primaryKey().notNull(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  emailVerifiedAt: timestamp("emailVerifiedAt"),
+  verificationTokenHash: varchar("verificationTokenHash", { length: 64 }),
+  verificationExpiresAt: timestamp("verificationExpiresAt"),
+  verificationSentAt: timestamp("verificationSentAt"),
+  passwordResetTokenHash: varchar("passwordResetTokenHash", { length: 64 }),
+  passwordResetExpiresAt: timestamp("passwordResetExpiresAt"),
+  passwordResetSentAt: timestamp("passwordResetSentAt"),
+  passwordChangedAt: timestamp("passwordChangedAt"),
+  termsAcceptedAt: timestamp("termsAcceptedAt").notNull(),
+  privacyAcceptedAt: timestamp("privacyAcceptedAt").notNull(),
+  dataProcessingAcceptedAt: timestamp("dataProcessingAcceptedAt").notNull(),
+  failedLoginAttempts: int("failedLoginAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export const universities = mysqlTable("universities", {
   id: int("id").autoincrement().primaryKey(),
   country: varchar("country", { length: 80 }).notNull(),
@@ -139,6 +160,7 @@ export const emailLogs = mysqlTable("emailLogs", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type ClientAuthAccount = typeof clientAuthAccounts.$inferSelect;
 export type University = typeof universities.$inferSelect;
 export type Program = typeof programs.$inferSelect;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;

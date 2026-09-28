@@ -15,14 +15,8 @@ services:
         value: "true"
       - key: JWT_SECRET
         sync: false
-      - key: VITE_APP_ID
-        sync: false
       - key: OAUTH_SERVER_URL
         value: https://api.manus.im
-      - key: OWNER_OPEN_ID
-        sync: false
-      - key: VITE_OAUTH_PORTAL_URL
-        sync: false
       - key: SUPER_ADMIN_EMAIL
         value: icxps.sale@outlook.com
       - key: NEXT_PUBLIC_SITE_URL

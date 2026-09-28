@@ -11,12 +11,17 @@ import {
   getEmailLogs, getPartnershipRequestsForUser, getRecentAdminNotifications,
   getServiceDocumentById, getServiceDocumentsForUser, getServiceRequestById,
   getServiceRequestsForUser, getUserById, getUserNotifications, getUsersForAdmin,
+  clearClientLoginFailures, createClientAuthAccount, getClientAuthByEmail,
+  recordClientLoginFailure, resetClientPassword, saveClientPasswordResetToken,
+  updateClientVerificationToken, updateUserLastSignedIn, verifyClientEmailToken,
   getWorkflowProgressForUser, listUsers, saveWorkflowProgress, setUserRoleByEmail,
   updateServiceRequestAdmin, updateServiceRequestStatus,
 } from "./db";
 import { storagePut, storageGetSignedUrl } from "./storage";
 import { ENV } from "./_core/env";
 import { escapeHtml, resendConfigured, sendTransactionalEmail } from "./_core/resend";
+import { assertAuthRateLimit, burnPasswordVerification, createOneTimeToken, hashOneTimeToken, hashPassword, normalizeEmail, verifyPassword } from "./_core/clientAuth";
+import { sdk } from "./_core/sdk";
 import {
   disconnectOutlook, getOutlookMessage, listOutlookAttachments, listOutlookFolders, listOutlookMessages, microsoftAdminConfigured,
   moveOutlookMessage, outlookIntegrationStatus, replyToOutlookMessage, setOutlookMessageRead,
@@ -57,11 +62,170 @@ function safeFileName(fileName: string) {
 const requestStatus = z.enum(["Reçu", "En cours d’analyse", "Documents complémentaires requis", "Accepté", "Refusé", "Clôturé"]);
 const requestPriority = z.enum(["low", "normal", "high", "urgent"]);
 
+const LOCAL_SESSION_APP_ID = "icx-power-solutions-client";
+const LOCAL_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function authRateLimit(ip: string | undefined, action: string, email: string, limit: number) {
+  try {
+    const remote = ip || "unknown";
+    assertAuthRateLimit(`${action}:ip:${remote}`, Math.max(limit * 3, limit), 15 * 60 * 1000);
+    assertAuthRateLimit(`${action}:account:${email}`, limit, 15 * 60 * 1000);
+  } catch {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de tentatives. Réessayez dans quelques minutes." });
+  }
+}
+
+function authEmailBaseUrl(req: { protocol: string; get(name: string): string | undefined }) {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.PUBLIC_APP_URL?.trim();
+  const raw = configured || (ENV.isProduction ? "" : `${req.protocol}://${req.get("host") || "localhost:3000"}`);
+  if (!raw || raw.includes("VOTRE-SERVICE")) throw new Error("NEXT_PUBLIC_SITE_URL must be set to the deployed site URL");
+  const url = new URL(raw);
+  if (ENV.isProduction && url.protocol !== "https:") throw new Error("The public site URL must use HTTPS in production");
+  if (url.username || url.password || url.search || url.hash) throw new Error("The public site URL must be an origin without credentials, query, or fragment");
+  return url.origin;
+}
+
+function oneTimeLink(req: { protocol: string; get(name: string): string | undefined }, path: string, token: string) {
+  const url = new URL(path, authEmailBaseUrl(req));
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+function sendVerificationEmail(req: { protocol: string; get(name: string): string | undefined }, email: string, name: string, token: string, tokenHash: string) {
+  const link = oneTimeLink(req, "/verification-email", token);
+  const safeName = escapeHtml(name);
+  return sendAndLogEmail({
+    to: email,
+    subject: "Confirmez votre adresse e-mail — ICX Power Solutions",
+    text: `Bonjour ${name}, confirmez votre adresse e-mail en ouvrant ce lien (valable 24 heures) : ${link}`,
+    html: `<p>Bonjour ${safeName},</p><p>Confirmez votre adresse e-mail pour activer votre espace client ICX.</p><p><a href="${escapeHtml(link)}">Confirmer mon adresse</a></p><p>Ce lien expire dans 24 heures. Si vous n’avez pas créé de compte, ignorez ce message.</p>`,
+    idempotencyKey: `client-verify-${tokenHash}`,
+  });
+}
+
+function sendPasswordResetEmail(req: { protocol: string; get(name: string): string | undefined }, email: string, name: string, token: string, tokenHash: string) {
+  const link = oneTimeLink(req, "/mot-de-passe-oublie", token);
+  const safeName = escapeHtml(name);
+  return sendAndLogEmail({
+    to: email,
+    subject: "Réinitialisation de votre mot de passe — ICX Power Solutions",
+    text: `Bonjour ${name}, réinitialisez votre mot de passe dans les 30 minutes : ${link}. Si vous n’avez pas demandé cette opération, ignorez ce message.`,
+    html: `<p>Bonjour ${safeName},</p><p>Une demande de réinitialisation a été faite pour votre espace ICX.</p><p><a href="${escapeHtml(link)}">Choisir un nouveau mot de passe</a></p><p>Le lien expire dans 30 minutes. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.</p>`,
+    idempotencyKey: `client-reset-${tokenHash}`,
+  });
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    isSuperAdmin: protectedProcedure.query(({ ctx }) => isSuperAdminIdentity(ctx.user)),
+    isSuperAdmin: publicProcedure.query(({ ctx }) => Boolean(ctx.adminAuthenticated && ctx.user && isSuperAdminIdentity(ctx.user))),
+    register: publicProcedure.input(z.object({
+      firstName: z.string().trim().min(1).max(120),
+      lastName: z.string().trim().min(1).max(120),
+      email: z.string().trim().email().max(320),
+      password: z.string().min(12).max(128),
+      acceptTerms: z.literal(true),
+      acceptPrivacy: z.literal(true),
+      acceptDataProcessing: z.literal(true),
+    })).mutation(async ({ ctx, input }) => {
+      const email = normalizeEmail(input.email);
+      if (email === ENV.superAdminEmail) throw new TRPCError({ code: "FORBIDDEN", message: "Utilisez la connexion administrateur Microsoft pour cette adresse." });
+      authRateLimit(ctx.req.ip || ctx.req.socket.remoteAddress, "register", email, 5);
+      const now = new Date();
+      const { token, tokenHash } = createOneTimeToken();
+      const passwordHash = await hashPassword(input.password);
+      const name = `${input.firstName} ${input.lastName}`.trim();
+      let result: Awaited<ReturnType<typeof createClientAuthAccount>>;
+      try {
+        result = await createClientAuthAccount({
+          email, name, openId: `local:${crypto.randomUUID()}`, passwordHash,
+          verificationTokenHash: tokenHash, verificationExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          verificationSentAt: now, termsAcceptedAt: now, privacyAcceptedAt: now, dataProcessingAcceptedAt: now,
+        });
+      } catch (error) {
+        const dbError = error as { code?: string; errno?: number };
+        if (dbError.code === "ER_DUP_ENTRY" || dbError.errno === 1062) return { success: true } as const;
+        console.warn("[Client auth] Registration could not create the account:", error instanceof Error ? error.message : "unknown error");
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Le compte n’a pas pu être créé. Vérifiez la configuration de la base puis réessayez." });
+      }
+      if (!result.user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Le compte n’a pas pu être créé. Réessayez." });
+      if (result.created) {
+        await sendVerificationEmail(ctx.req, email, name, token, tokenHash);
+      } else if (result.account && !result.account.emailVerifiedAt) {
+        const lastSent = result.account.verificationSentAt?.getTime() ?? 0;
+        if (!lastSent || now.getTime() - lastSent >= 60_000) {
+          const replacement = createOneTimeToken();
+          await updateClientVerificationToken(result.user.id, replacement.tokenHash, new Date(now.getTime() + 24 * 60 * 60 * 1000), now);
+          await sendVerificationEmail(ctx.req, email, result.user.name || name, replacement.token, replacement.tokenHash);
+        }
+      }
+      return { success: true } as const;
+    }),
+    login: publicProcedure.input(z.object({ email: z.string().trim().email().max(320), password: z.string().min(1).max(128) })).mutation(async ({ ctx, input }) => {
+      const email = normalizeEmail(input.email);
+      authRateLimit(ctx.req.ip || ctx.req.socket.remoteAddress, "login", email, 20);
+      const record = await getClientAuthByEmail(email);
+      if (!record) {
+        await burnPasswordVerification(input.password);
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Adresse e-mail ou mot de passe incorrect." });
+      }
+      const now = new Date();
+      if (record.account.lockedUntil && record.account.lockedUntil > now) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Compte temporairement verrouillé après plusieurs essais. Réessayez plus tard." });
+      }
+      if (!await verifyPassword(input.password, record.account.passwordHash)) {
+        const lockedUntil = await recordClientLoginFailure(record.user.id, now);
+        if (lockedUntil && lockedUntil > now) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop d’essais. Réessayez dans 15 minutes." });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Adresse e-mail ou mot de passe incorrect." });
+      }
+      if (!record.account.emailVerifiedAt) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirmez votre adresse e-mail avant de vous connecter." });
+      await clearClientLoginFailures(record.user.id);
+      await updateUserLastSignedIn(record.user.id, now);
+      const sessionToken = await sdk.signSession({ openId: record.user.openId, appId: LOCAL_SESSION_APP_ID, name: record.user.name || email }, { expiresInMs: LOCAL_SESSION_MS });
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, sameSite: "lax", maxAge: LOCAL_SESSION_MS });
+      return { success: true } as const;
+    }),
+    resendVerification: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).mutation(async ({ ctx, input }) => {
+      const email = normalizeEmail(input.email);
+      authRateLimit(ctx.req.ip || ctx.req.socket.remoteAddress, "verify-resend", email, 5);
+      const record = await getClientAuthByEmail(email);
+      if (!record || record.account.emailVerifiedAt) return { success: true } as const;
+      const now = new Date();
+      const lastSent = record.account.verificationSentAt?.getTime() ?? 0;
+      if (lastSent && now.getTime() - lastSent < 60_000) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Attendez une minute avant de redemander le lien." });
+      const { token, tokenHash } = createOneTimeToken();
+      await updateClientVerificationToken(record.user.id, tokenHash, new Date(now.getTime() + 24 * 60 * 60 * 1000), now);
+      await sendVerificationEmail(ctx.req, email, record.user.name || email, token, tokenHash);
+      return { success: true } as const;
+    }),
+    verifyEmail: publicProcedure.input(z.object({ token: z.string().min(20).max(256) })).mutation(async ({ ctx, input }) => {
+      authRateLimit(ctx.req.ip || ctx.req.socket.remoteAddress, "email-verify", hashOneTimeToken(input.token), 10);
+      const user = await verifyClientEmailToken(hashOneTimeToken(input.token));
+      if (!user) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce lien de confirmation est invalide ou expiré." });
+      return { success: true } as const;
+    }),
+    requestPasswordReset: publicProcedure.input(z.object({ email: z.string().trim().email().max(320) })).mutation(async ({ ctx, input }) => {
+      const email = normalizeEmail(input.email);
+      authRateLimit(ctx.req.ip || ctx.req.socket.remoteAddress, "password-reset", email, 5);
+      const record = await getClientAuthByEmail(email);
+      if (!record || !record.account.emailVerifiedAt) return { success: true } as const;
+      const now = new Date();
+      const lastSent = record.account.passwordResetSentAt?.getTime() ?? 0;
+      if (lastSent && now.getTime() - lastSent < 60_000) return { success: true } as const;
+      const { token, tokenHash } = createOneTimeToken();
+      await saveClientPasswordResetToken(record.user.id, tokenHash, new Date(now.getTime() + 30 * 60 * 1000), now);
+      await sendPasswordResetEmail(ctx.req, email, record.user.name || email, token, tokenHash);
+      return { success: true } as const;
+    }),
+    resetPassword: publicProcedure.input(z.object({ token: z.string().min(20).max(256), password: z.string().min(12).max(128) })).mutation(async ({ ctx, input }) => {
+      authRateLimit(ctx.req.ip || ctx.req.socket.remoteAddress, "password-reset-complete", hashOneTimeToken(input.token), 10);
+      const passwordHash = await hashPassword(input.password);
+      const reset = await resetClientPassword(hashOneTimeToken(input.token), passwordHash);
+      if (!reset) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Ce lien de réinitialisation est invalide ou expiré." });
+      return { success: true } as const;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { registerMicrosoftAdminAuthRoutes } from "./microsoftAdmin";
 import { registerMicrosoftAdminDownloadRoutes } from "./microsoftAdminDownloads";
 import { registerStorageProxy } from "./storageProxy";
@@ -20,7 +19,6 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   registerStorageProxy(app);
-  registerOAuthRoutes(app); // Manus OAuth remains exclusively for the public client site.
   registerMicrosoftAdminAuthRoutes(app); // Separate Microsoft sign-in for /admin only.
   registerMicrosoftAdminDownloadRoutes(app);
 

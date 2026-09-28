@@ -4,41 +4,41 @@ Plateforme web d’**ICX POWER SOLUTIONS SRL** (Roumanie), construite avec React
 
 ## Portail client
 
-- Site responsive et catalogue des services ICX.
-- Parcours études/admissions, espace client, demandes de service et téléversement de pièces.
-- Authentification client Manus OAuth conservée (`/connexion`, `/inscription`, `/mon-espace`).
+- Site responsive, catalogue des services, espace client, demandes et téléversement de pièces.
+- Connexion indépendante de Manus : inscription e-mail/mot de passe, confirmation obligatoire par e-mail, limitation des tentatives, session HttpOnly et réinitialisation du mot de passe.
+- Les liens de confirmation et de récupération sont envoyés via Resend; l’adresse expéditrice doit appartenir à un domaine vérifié.
 - Interface multilingue (FR, EN, ZH, RO, PL, AR) avec direction RTL pour l’arabe.
 
 ## Console admin
 
 - `/admin` sert `client/admin.html` et son bundle React dédié, indépendamment du point d’entrée public `client/index.html`.
-- La connexion admin est distincte de Manus : OAuth Microsoft/Entra pour le seul compte autorisé `SUPER_ADMIN_EMAIL` (par défaut `icxps.sale@outlook.com`), cookie HttpOnly séparé et autorisation contrôlée sur le serveur.
-- Fonctions : demandes, statuts, priorités, attribution, notes internes, notifications client, journal d’activité, comptes/rôles (super-admin), tableau des fichiers clients avec téléchargements signés, journal d’e-mails Resend et boîte Outlook Graph (dossiers, lecture du message, pièces jointes, marquer lu/non lu, déplacer, répondre).
-- La connexion client Manus reste inchangée; la console ne redirige pas vers `/app-auth`.
+- La connexion admin reste distincte : Microsoft/Entra pour le seul compte configuré dans `SUPER_ADMIN_EMAIL` (par défaut `icxps.sale@outlook.com`), avec cookie HttpOnly séparé.
+- Les routes et téléchargements d’administration exigent cette session Microsoft; un compte client, même s’il porte le rôle `admin` en base, ne peut pas ouvrir la console.
+- Fonctions : demandes, statuts, priorités, notifications, gestion des rôles (super-admin), téléchargements signés, journal d’e-mails et boîte Outlook Graph.
 
 ## Déploiement Render / TiDB
 
-1. Configurez les variables depuis `.env.render.template` dans **Render → votre Web Service → Environment**. Pour Microsoft, le callback doit correspondre exactement à `https://VOTRE-DOMAINE/api/admin/auth/callback` dans Render et Microsoft Entra.
-2. `DATABASE_URL` doit utiliser le schéma MySQL/TiDB dédié au site; ne pas utiliser `sys`. Le pool du serveur active TLS 1.2 pour les hôtes TiDB Cloud; `DATABASE_SSL=true` est inscrit dans le blueprint.
-3. Appliquez les migrations avec `pnpm db:push` depuis un shell ayant les variables Render/TiDB appropriées. La commande versionnée respecte TLS et applique `0005_create_users_table.sql` puis `0006_admin_console.sql` selon le journal de migration.
-4. Poussez ces fichiers vers la branche reliée à Render, puis lancez **Manual Deploy → Deploy latest commit**. Ouvrez `/admin`, connectez-vous avec le compte Outlook autorisé, puis contrôlez **Système & intégrations**.
-5. Resend nécessite une clé serveur et un expéditeur dont le domaine est vérifié chez Resend. Les fichiers du site utilisent le stockage Forge déjà présent dans ce projet.
+1. Configurez les variables dans Render à partir de `.env.render.template`. `NEXT_PUBLIC_SITE_URL` doit être l’origine HTTPS exacte du service public Render, sans chemin ni barre finale. Aucun `VITE_APP_ID` ou portail Manus n’est requis pour l’inscription client.
+2. `DATABASE_URL` doit pointer vers un schéma MySQL/TiDB dédié au site; ne pas utiliser le schéma système `sys`. `DATABASE_SSL=true` active le TLS TiDB Cloud.
+3. Déployez le commit sur Render, ouvrez le Shell du service, puis exécutez `pnpm db:push` une seule fois après sauvegarde/contrôle de la base. Cette commande versionnée applique notamment `0005_create_users_table.sql`, `0006_admin_console.sql` et `0007_client_auth.sql`.
+4. Testez le parcours client avec une adresse de test : inscription → réception de l’e-mail → confirmation → connexion → demande de réinitialisation. Vérifiez l’arrivée des messages et les journaux Resend.
+5. Testez `/admin` séparément avec le compte Microsoft autorisé et vérifiez **Système & intégrations**. Le callback Microsoft doit correspondre exactement à l’URI Web configurée dans Entra et à `MICROSOFT_REDIRECT_URI` sur Render.
 
-Le Blueprint ne provisionne pas de PostgreSQL Render : ce projet utilise `drizzle-orm/mysql2`, donc TiDB/MySQL. Voir le guide détaillé [ADMIN_SETUP_FR.md](ADMIN_SETUP_FR.md).
+La connexion client n’a besoin ni de `VITE_APP_ID`, ni de `VITE_OAUTH_PORTAL_URL`; ces valeurs Manus manquantes ne bloquent donc plus le site. Le Blueprint ne provisionne pas PostgreSQL Render : le code utilise `drizzle-orm/mysql2` et TiDB/MySQL.
 
-## Variables d’environnement principales
+## Variables principales
 
-- **Site client** : `DATABASE_URL`, `DATABASE_SSL`, `JWT_SECRET`, `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `OWNER_OPEN_ID`.
-- **Admin Microsoft** : `SUPER_ADMIN_EMAIL`, `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `INTEGRATION_ENCRYPTION_KEY`.
-- **E-mails** : `RESEND_API_KEY`, `RESEND_FROM_NAME`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO`.
+- **Base et sessions** : `DATABASE_URL`, `DATABASE_SSL`, `JWT_SECRET`, `NEXT_PUBLIC_SITE_URL`.
+- **Console Microsoft admin** : `SUPER_ADMIN_EMAIL`, `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `INTEGRATION_ENCRYPTION_KEY`.
+- **Courriels** : `RESEND_API_KEY`, `RESEND_FROM_NAME`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO`.
 - **Fichiers** : `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`.
 
 Ne commitez jamais de secrets. Les variables `VITE_*` sont intégrées au bundle client; n’y mettez jamais de secret.
 
-## Vérifications
+## Vérifications locales
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm check
 pnpm test
 pnpm build
@@ -46,9 +46,9 @@ pnpm build
 
 Le serveur de production expose `/healthz` et se lie sur `0.0.0.0:$PORT`.
 
-## À terminer avant une ouverture publique
+## À valider avant une ouverture publique
 
-- Confirmer les mentions légales, les données de société, les coordonnées et la politique de confidentialité.
+- Confirmer les mentions légales, les données de société, les coordonnées et le contenu des cases d’acceptation.
 - Activer et imposer l’authentification multifacteur sur le compte Microsoft administrateur.
-- Ajouter une politique de types de fichier stricte, antivirus, limitation de débit et rétention/sauvegarde adaptée aux dossiers clients.
-- Valider les autorisations, le domaine expéditeur Resend, la liste IP réseau TiDB et un scénario de demande de bout en bout avec un compte de test.
+- Vérifier le domaine expéditeur Resend, la liste IP réseau TiDB, les sauvegardes et la rétention des dossiers clients.
+- Tester les protections anti-brute-force avec un compte de test; ne pas utiliser de véritables dossiers clients pour les essais.

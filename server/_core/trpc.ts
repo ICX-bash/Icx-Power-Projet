@@ -39,6 +39,9 @@ export const adminProcedure = t.procedure.use(
     if (!ctx.user) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
+    if (!ctx.adminAuthenticated) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Microsoft administrator session required" });
+    }
     if (ctx.user.role !== "admin" && !isSuperAdminIdentity(ctx.user)) {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
@@ -57,6 +60,7 @@ export const superAdminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
     if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    if (!ctx.adminAuthenticated) throw new TRPCError({ code: "FORBIDDEN", message: "Microsoft administrator session required" });
     if (!isSuperAdminIdentity(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Super-administrator access required" });
     return next({ ctx: { ...ctx, user: ctx.user } });
   }),

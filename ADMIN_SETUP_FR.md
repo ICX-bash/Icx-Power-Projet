@@ -2,7 +2,7 @@
 
 ## Ce qui a été séparé
 
-- Le portail client continue à utiliser son authentification Manus.
+- Le portail client utilise désormais ses propres comptes e-mail/mot de passe, avec vérification Resend et réinitialisation.
 - `/admin` est un document HTML et un bundle React autonomes; il ne charge plus la page d’accueil du client.
 - La connexion admin est réservée au compte Microsoft autorisé configuré dans `SUPER_ADMIN_EMAIL` (par défaut `icxps.sale@outlook.com`). Elle utilise un cookie serveur HttpOnly distinct.
 - L’accès aux routes de demandes, fichiers et intégrations est contrôlé côté serveur. Les pièces jointes ne sont proposées qu’après contrôle de session et émission d’une URL signée du stockage.
@@ -24,9 +24,11 @@ Dans **Render Dashboard → votre Web Service → Environment**, ajoutez ou vér
 | `RESEND_REPLY_TO` | `icxps.sale@outlook.com`. |
 | `DATABASE_URL` | URL TiDB/MySQL du schéma ICX dédié; éviter le schéma système `sys`. Ne pas remplacer `<PASSWORD>` par un mot de passe dans Git. |
 | `DATABASE_SSL` | `true` pour TiDB Cloud via l’endpoint public (valeur déjà inscrite dans `render.yaml`). Le serveur active TLS 1.2 pour les hôtes `*.tidbcloud.com`. |
+| `JWT_SECRET` | Secret aléatoire long, côté serveur uniquement; utilisé pour signer les sessions client et Microsoft admin. |
+| `NEXT_PUBLIC_SITE_URL` | URL HTTPS exacte du service public Render, sans chemin ni barre finale; nécessaire aux liens de vérification et de réinitialisation envoyés par Resend. |
 | `BUILT_IN_FORGE_API_URL` et `BUILT_IN_FORGE_API_KEY` | Nécessaires au stockage Forge que ce projet utilise déjà pour les fichiers du portail client. |
 
-`VITE_APP_ID`, `VITE_OAUTH_PORTAL_URL` et `OAUTH_SERVER_URL` restent uniquement dans le parcours Manus du **site client**. La console admin ne redirige plus vers `/app-auth`.
+La connexion client ne dépend plus de Manus. `VITE_APP_ID` et `VITE_OAUTH_PORTAL_URL` ne sont plus requis et peuvent être retirés des variables Render. `NEXT_PUBLIC_SITE_URL` doit être l’URL HTTPS publique exacte du service, sans chemin, pour construire les liens de vérification et de récupération. `OAUTH_SERVER_URL` est une variable historique côté serveur et n’est pas utilisée pour connecter les clients. La console admin conserve la connexion Microsoft séparée.
 
 Dans l’URL TiDB que vous avez montrée, le suffixe `/sys` sélectionne le schéma SQL `sys`. Ce schéma est réservé au système; l’application doit utiliser une base dédiée. Si votre compte TiDB a les droits de création, créez-la dans le SQL Editor TiDB :
 
@@ -70,9 +72,10 @@ Le portail envoie les accusés de réception, changements de statut et notificat
    ```
 
 5. Dans Render, lancez **Manual Deploy → Deploy latest commit** (ou vérifiez le déploiement automatique de `main`).
-6. Après le déploiement, ouvrez le **Shell** du service Render et exécutez `pnpm db:push`. Le script applique les migrations versionnées avec le pool TiDB/TLS du serveur. Vérifiez que `DATABASE_URL` utilise un schéma ICX dédié, par exemple `icx_power_solutions`, pas `sys`, et que le mot de passe est correctement encodé dans l’URL.
+6. Après le déploiement, ouvrez le **Shell** du service Render et exécutez `pnpm db:push`. Le script applique les migrations versionnées avec le pool TiDB/TLS du serveur, dont `0007_client_auth.sql`. Vérifiez que `DATABASE_URL` utilise un schéma ICX dédié, par exemple `icx_power_solutions`, pas `sys`, et que le mot de passe est correctement encodé dans l’URL.
 7. Ouvrez `/admin`, puis **Continuer avec Microsoft** et acceptez les permissions demandées avec `icxps.sale@outlook.com`.
 8. Vérifiez dans **Système & intégrations** que Outlook, Resend, stockage et base sont marqués « Prêt » / « Connecté ». Envoyez une demande test et vérifiez la notification client, l’e-mail Resend, puis le téléchargement d’un document dans la console admin.
+9. Testez séparément le portail public avec une adresse de test : inscription → e-mail de confirmation → connexion → mot de passe oublié. La session client ne doit jamais ouvrir `/admin`; utilisez la connexion Microsoft distincte pour l’administration.
 
 Le fichier `render.yaml` ne provisionne plus de base Render PostgreSQL : le code utilise `drizzle-orm/mysql2` et doit utiliser TiDB/MySQL, pas PostgreSQL.
 

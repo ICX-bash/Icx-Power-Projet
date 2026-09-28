@@ -19,6 +19,8 @@ function Router() {
     <Route path="/assistant" component={Assistant} />
     <Route path="/connexion" component={Home} />
     <Route path="/inscription" component={Home} />
+    <Route path="/mot-de-passe-oublie" component={Home} />
+    <Route path="/verification-email" component={Home} />
     <Route path="/confidentialite" component={Home} />
     <Route path="/mentions-legales" component={Home} />
     <Route path="/404" component={NotFound} />

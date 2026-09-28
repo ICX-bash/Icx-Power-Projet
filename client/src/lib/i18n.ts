@@ -32,3 +32,41 @@ const pl: SiteCopy = { ...en, homeEyebrow: "Międzynarodowa platforma wsparcia",
 const ar: SiteCopy = { ...en, homeEyebrow: "منصة دعم دولية", homeTitle: "العلاقات الصحيحة تفتح آفاقاً جديدة.", homeLead: "تدعم ICX Power Solutions الشركات والمواهب والمشاريع الدولية بمنهجية وصرامة وقرب.", exploreApproach: "اكتشف نهجنا", explorePrograms: "استكشف البرامج", expertiseEyebrow: "خدماتنا المتخصصة", expertiseTitle: "نقطة البداية المناسبة لكل طموح.", viewStudies: "افتح منصة الدراسات", viewService: "عرض الخدمة", backHome: "العودة إلى الرئيسية", expected: "ما يمكنكم توقعه", progression: "تقدم المسار", framing: "التخطيط", assessment: "التقييم", request: "الطلب", chooseEntry: "اختر نقطة البداية", secureProject: "طلبك يستحق مساحة آمنة.", finalise: "إكمال الطلب", addDocuments: "إضافة مستندات", saveRequest: "حفظ الطلب", saving: "جارٍ الحفظ…", serviceOverview: "نظرة عامة", startRequest: "فتح مساحة آمنة", studiesEyebrow: "خدمة الدراسات", studiesTitle: "خطوتك التالية تستحق بداية حقيقية.", studiesBody: "استكشف الجامعات والبرامج وقارن المعايير وتواصل مع ICX عندما تتضح الصورة.", searchStudies: "ابحث عن جامعة أو مدينة أو مجال", universities: "الجامعات", programmes: "البرامج الدراسية", allCountries: "كل البلدان", allLevels: "كل المستويات", reset: "إعادة ضبط الفلاتر", noStudyResults: "لا توجد نتائج مطابقة.", contactIcx: "تواصل مع ICX POWER SOLUTIONS SRL" };
 
 export const siteCopy: Record<Locale, SiteCopy> = { fr, en, zh, ro, pl, ar };
+
+
+export const localeOptions: Array<{ code: Locale; label: string; nativeLabel: string }> = [
+  { code: "fr", label: "Français", nativeLabel: "Français" },
+  { code: "en", label: "English", nativeLabel: "English" },
+  { code: "ro", label: "Roumain", nativeLabel: "Română" },
+  { code: "pl", label: "Polonais", nativeLabel: "Polski" },
+  { code: "ar", label: "Arabe", nativeLabel: "العربية" },
+  { code: "zh", label: "Chinois", nativeLabel: "中文" },
+];
+
+export const isLocale = (value: string | null): value is Locale => Boolean(value && localeOptions.some(option => option.code === value));
+export const detectLocale = (): Locale => {
+  const saved = typeof window !== "undefined" ? window.localStorage.getItem("icx-locale") : null;
+  if (isLocale(saved)) return saved;
+  const browser = typeof navigator !== "undefined" ? navigator.language.toLowerCase() : "fr";
+  if (browser.startsWith("ro")) return "ro";
+  if (browser.startsWith("pl")) return "pl";
+  if (browser.startsWith("ar")) return "ar";
+  if (browser.startsWith("zh")) return "zh";
+  if (browser.startsWith("en")) return "en";
+  return "fr";
+};
+
+// Keep the shared UI dictionary complete for every supported locale. These keys
+// are used across every service route, not only on the home page.
+Object.assign(siteCopy.ro, {
+  chooseLanguage: "Alegeți limba", serviceMethodTitle: "Un parcurs structurat, adaptat contextului dumneavoastră.", serviceMethodBody: "Echipa noastră construiește împreună cu dumneavoastră un răspuns precis, documentat și aplicabil, apoi îl urmărește într-un spațiu securizat.", chooseEntryBody: "Această etapă ajută ICX să adapteze nivelul de detaliu, documentele și următoarea acțiune.", confidential: "Datele dumneavoastră sunt tratate confidențial", partnersButton: "Vezi partenerii", operationalPartner: "Partener operațional · România", expansionButton: "Vezi direcțiile parteneriale"
+});
+Object.assign(siteCopy.pl, {
+  chooseLanguage: "Wybierz język", serviceMethodTitle: "Ustrukturyzowany proces dopasowany do Twojego kontekstu.", serviceMethodBody: "Nasz zespół tworzy z Tobą precyzyjną, udokumentowaną i praktyczną odpowiedź, a następnie prowadzi ją w bezpiecznej przestrzeni.", chooseEntryBody: "Ten etap pomaga ICX dopasować szczegóły, dokumenty i następne działanie.", confidential: "Twoje dane są przetwarzane poufnie", partnersButton: "Zobacz partnerów", operationalPartner: "Partner operacyjny · Rumunia", expansionButton: "Zobacz kierunki partnerskie"
+});
+Object.assign(siteCopy.ar, {
+  chooseLanguage: "اختر اللغة", serviceMethodTitle: "مسار منظم ومناسب لسياقك.", serviceMethodBody: "يبني فريقنا معك استجابة دقيقة وموثقة وقابلة للتنفيذ، ثم يتابعها في مساحة آمنة.", chooseEntryBody: "تساعد هذه الخطوة ICX على تكييف مستوى التفاصيل والوثائق والإجراء التالي.", confidential: "تُعالَج بياناتك بسرية", partnersButton: "عرض الشركاء", operationalPartner: "شريك تشغيلي · رومانيا", expansionButton: "عرض مسارات الشراكة"
+});
+Object.assign(siteCopy.zh, {
+  chooseLanguage: "选择语言", serviceMethodTitle: "根据您的情况制定清晰、结构化的流程。", serviceMethodBody: "我们的团队与您共同制定精准、可记录且可执行的方案，并在安全空间中持续跟进。", chooseEntryBody: "此步骤帮助 ICX 调整信息详略、所需文件和下一步行动。", confidential: "您的数据将得到保密处理", partnersButton: "查看合作伙伴", operationalPartner: "运营合作伙伴 · 罗马尼亚", expansionButton: "查看合作方向"
+});

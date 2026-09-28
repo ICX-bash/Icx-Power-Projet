@@ -112,7 +112,13 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { scroll-behavior: smooth; }
-  body { @apply bg-background text-foreground font-sans antialiased; }
+  body { @apply bg-background text-foreground font-sans antialiased; line-height: 1.65; }
+  p { text-wrap: pretty; }
+  main p { max-width: 72ch; }
+  h1, h2, h3, h4 { text-wrap: balance; line-height: 1.15; }
+  [dir="rtl"] { font-family: "Noto Sans Arabic", "Tahoma", var(--font-sans); }
+  [dir="rtl"] .text-left { text-align: right; }
+  [dir="rtl"] .text-right { text-align: left; }
   button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [type="button"]:not(:disabled), [type="submit"]:not(:disabled), a[href], select:not(:disabled), input[type="checkbox"]:not(:disabled), input[type="radio"]:not(:disabled) { @apply cursor-pointer; }
   ::selection { background: rgba(225, 29, 72, .18); }
 }
@@ -138,7 +144,10 @@
   main [class~="mt-10"] { margin-top: 1.75rem !important; }
   main [class~="mt-9"] { margin-top: 1.5rem !important; }
   main [class~="mt-8"] { margin-top: 1.25rem !important; }
-  main [class~="leading-6"], main [class~="leading-7"], main [class~="leading-8"] { text-align: justify; text-wrap: pretty; }
+  main [class~="leading-6"], main [class~="leading-7"], main [class~="leading-8"] { line-height: 1.75 !important; text-wrap: pretty; }
+  main p:not([class*="leading-"]) { line-height: 1.7; }
+  main h1, main h2 { letter-spacing: -0.03em; }
+  [dir="rtl"] main p { text-align: right; }
 }
 
 @keyframes assistant-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }

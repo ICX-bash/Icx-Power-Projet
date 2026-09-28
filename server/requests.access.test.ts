@@ -37,7 +37,7 @@ describe("requests and notifications access", () => {
   });
 
   it("recognizes the configured principal super-admin", async () => {
-    const caller = appRouter.createCaller({ ...publicContext, user: { id: 1, openId: "principal", email: "ICXPS.SALE@OUTLOOK.COM", name: "ICX Principal", role: "admin" } as any });
+    const caller = appRouter.createCaller({ ...publicContext, user: { id: 1, openId: "principal", email: "ICXPS.SALE@OUTLOOK.COM", name: "ICX Principal", role: "user" } as any });
     await expect(caller.admin.users()).resolves.toEqual(expect.any(Array));
   });
 

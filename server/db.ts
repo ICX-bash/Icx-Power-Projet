@@ -52,12 +52,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
     }
-    if (user.role !== undefined) {
+    const isPrincipal = user.openId === ENV.ownerOpenId || user.email?.toLowerCase() === ENV.superAdminEmail;
+    if (isPrincipal) {
+      // The configured principal cannot be downgraded by a stale identity-provider role.
+      values.role = "admin";
+      updateSet.role = "admin";
+    } else if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId || user.email?.toLowerCase() === ENV.superAdminEmail) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {

@@ -28,11 +28,15 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+const isSuperAdminIdentity = (user: TrpcContext["user"]) => Boolean(
+  user && (user.email?.toLowerCase() === ENV.superAdminEmail || user.openId === ENV.ownerOpenId),
+);
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || ctx.user.role !== 'admin') {
+    if (!ctx.user || (ctx.user.role !== "admin" && !isSuperAdminIdentity(ctx.user))) {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
@@ -49,8 +53,7 @@ export const adminProcedure = t.procedure.use(
 export const superAdminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
-    const isSuperAdmin = Boolean(ctx.user && (ctx.user.email?.toLowerCase() === ENV.superAdminEmail || ctx.user.openId === ENV.ownerOpenId));
-    if (!isSuperAdmin) throw new TRPCError({ code: "FORBIDDEN", message: "Super-administrator access required" });
+    if (!isSuperAdminIdentity(ctx.user)) throw new TRPCError({ code: "FORBIDDEN", message: "Super-administrator access required" });
     return next({ ctx: { ...ctx, user: ctx.user } });
   }),
 );

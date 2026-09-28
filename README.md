@@ -1,69 +1,54 @@
 # ICX Power Solutions
 
-Institutional web platform for **ICX POWER SOLUTIONS SRL** (Romania), built on the Manus WebDev full-stack template.
+Plateforme web d’**ICX POWER SOLUTIONS SRL** (Roumanie), construite avec React, Express/tRPC, Drizzle et MySQL/TiDB.
 
-## Included in this release
+## Portail client
 
-- Responsive public site with ICX visual system, six service routes, internal service tabs, and a protected-contact entry point.
-- Admissions workbench at `/etudes` with combined country / level / text filters, program detail modal, required-document checklist, and auth-gated application CTA.
-- Built-in Manus OAuth session flow with `/connexion`, `/inscription`, `/mon-espace`, and a visually separate `/admin` console. Login and account creation happen at the identity provider; the public site does not simulate passwords or account creation.
-- Light / dark theme toggle, six-language selector (French, English, Chinese, Romanian, Polish, Arabic), and RTL direction for Arabic.
-- Domain tables in `drizzle/schema.ts` for universities, programs, service requests, application cases, and audit logs.
-- Render and Netlify deployment templates, including a fast `/healthz` readiness endpoint and direct `PORT` binding.
-- Clearly flagged placeholders for CUI, Nr. Reg. Com., company address, and partner legal data that must be confirmed before production publication.
+- Site responsive et catalogue des services ICX.
+- Parcours études/admissions, espace client, demandes de service et téléversement de pièces.
+- Authentification client Manus OAuth conservée (`/connexion`, `/inscription`, `/mon-espace`).
+- Interface multilingue (FR, EN, ZH, RO, PL, AR) avec direction RTL pour l’arabe.
 
-## Render deployment notes
+## Console admin
 
-The production server binds directly to Render's `PORT` on `0.0.0.0` and exposes `/healthz` before optional integrations. This removes the previous port scan and lets Render mark the service ready as soon as the HTTP process is listening. Render still needs valid environment variables and a non-sleeping plan for consistently fast first response times.
+- `/admin` sert `client/admin.html` et son bundle React dédié, indépendamment du point d’entrée public `client/index.html`.
+- La connexion admin est distincte de Manus : OAuth Microsoft/Entra pour le seul compte autorisé `SUPER_ADMIN_EMAIL` (par défaut `icxps.sale@outlook.com`), cookie HttpOnly séparé et autorisation contrôlée sur le serveur.
+- Fonctions : demandes, statuts, priorités, attribution, notes internes, notifications client, journal d’activité, comptes/rôles (super-admin), tableau des fichiers clients avec téléchargements signés, journal d’e-mails Resend et boîte Outlook Graph (dossiers, lecture du message, pièces jointes, marquer lu/non lu, déplacer, répondre).
+- La connexion client Manus reste inchangée; la console ne redirige pas vers `/app-auth`.
 
-## Local development
+## Déploiement Render / TiDB
+
+1. Configurez les variables depuis `.env.render.template` dans **Render → votre Web Service → Environment**. Pour Microsoft, le callback doit correspondre exactement à `https://VOTRE-DOMAINE/api/admin/auth/callback` dans Render et Microsoft Entra.
+2. `DATABASE_URL` doit utiliser le schéma MySQL/TiDB dédié au site; ne pas utiliser `sys`. Le pool du serveur active TLS 1.2 pour les hôtes TiDB Cloud; `DATABASE_SSL=true` est inscrit dans le blueprint.
+3. Appliquez les migrations avec `pnpm db:push` depuis un shell ayant les variables Render/TiDB appropriées. La commande versionnée respecte TLS et applique `0005_create_users_table.sql` puis `0006_admin_console.sql` selon le journal de migration.
+4. Poussez ces fichiers vers la branche reliée à Render, puis lancez **Manual Deploy → Deploy latest commit**. Ouvrez `/admin`, connectez-vous avec le compte Outlook autorisé, puis contrôlez **Système & intégrations**.
+5. Resend nécessite une clé serveur et un expéditeur dont le domaine est vérifié chez Resend. Les fichiers du site utilisent le stockage Forge déjà présent dans ce projet.
+
+Le Blueprint ne provisionne pas de PostgreSQL Render : ce projet utilise `drizzle-orm/mysql2`, donc TiDB/MySQL. Voir le guide détaillé [ADMIN_SETUP_FR.md](ADMIN_SETUP_FR.md).
+
+## Variables d’environnement principales
+
+- **Site client** : `DATABASE_URL`, `DATABASE_SSL`, `JWT_SECRET`, `VITE_APP_ID`, `OAUTH_SERVER_URL`, `VITE_OAUTH_PORTAL_URL`, `OWNER_OPEN_ID`.
+- **Admin Microsoft** : `SUPER_ADMIN_EMAIL`, `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `INTEGRATION_ENCRYPTION_KEY`.
+- **E-mails** : `RESEND_API_KEY`, `RESEND_FROM_NAME`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO`.
+- **Fichiers** : `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`.
+
+Ne commitez jamais de secrets. Les variables `VITE_*` sont intégrées au bundle client; n’y mettez jamais de secret.
+
+## Vérifications
 
 ```bash
 pnpm install
-pnpm dev
-```
-
-Useful checks:
-
-```bash
 pnpm check
 pnpm test
 pnpm build
 ```
 
-## Environment variables
+Le serveur de production expose `/healthz` et se lie sur `0.0.0.0:$PORT`.
 
-The WebDev runtime injects the Manus auth, database, storage, and built-in API variables listed in `server/_core/env.ts`. For a standalone Render / Netlify deployment, use `ENVIRONMENT.md` as the secret-manager checklist and fill every sensitive value there. Do not commit credentials.
+## À terminer avant une ouverture publique
 
-## Data model
-
-The initial migration `drizzle/0000_sleepy_mercury.sql` restores the missing users-table migration; `drizzle/0005_create_users_table.sql` safely ensures that table exists even when older migrations are already recorded. Apply migrations with `DATABASE_URL` configured using `pnpm db:push`.
-
-## Production follow-up before publication
-
-1. Replace the visual initials with the supplied high-resolution logo and team photos once those files are provided to the project workspace.
-2. Replace partner placeholders with official Lorondo Services SRL and AAFT Association assets and verified legal information. See `client/src/lib/partners.json`.
-3. Confirm CUI, Nr. Reg. Com., registered address, privacy policy, cookie policy, and terms with the client.
-4. Connect the application and service-request forms to the protected tRPC procedures, email provider, and S3 storage credentials.
-5. Configure transactional email, signed expiring document URLs, MIME verification / antivirus scanning, rate limiting, CSRF, and mandatory admin 2FA for production.
-
-## Routes
-
-| Route | Purpose |
-| --- | --- |
-| `/` | Public homepage |
-| `/services/:slug` | Service detail with internal tabs |
-| `/etudes` | University and programme finder |
-| `/partenaires` | Partner directory placeholder |
-| `/connexion` / `/inscription` | Auth entry surfaces |
-| `/mon-espace` | Protected client workspace surface |
-| `/admin` | Operations dashboard surface |
-| `/confidentialite` / `/mentions-legales` | Legal placeholders |
-## Administration and langues
-
-- Le compte `icxps.sale@outlook.com` est le **super-administrateur** par défaut.
-- Pour remplacer cette adresse en production, définir `SUPER_ADMIN_EMAIL` (l’ancien `ADMIN_EMAIL` reste accepté).
-- Ouvrir `/admin` puis se connecter via le fournisseur OAuth avec l’adresse super-admin. La redirection revient automatiquement dans la console après connexion.
-- La console lit les demandes enregistrées et permet de changer leur statut ; le super-administrateur peut consulter les comptes, promouvoir ou révoquer un rôle admin. Les permissions sont contrôlées côté serveur.
-- Le catalogue et le journal d’audit détaillé ne sont pas des outils actifs dans cette version ; la console l’indique au lieu d’afficher des chiffres ou actions simulés.
-- Le registre global des langues est centralisé dans `client/src/lib/i18n.ts` et couvre `fr`, `en`, `ro`, `pl`, `ar` et `zh`. Le choix est mémorisé et l’arabe active automatiquement le mode RTL.
+- Confirmer les mentions légales, les données de société, les coordonnées et la politique de confidentialité.
+- Activer et imposer l’authentification multifacteur sur le compte Microsoft administrateur.
+- Ajouter une politique de types de fichier stricte, antivirus, limitation de débit et rétention/sauvegarde adaptée aux dossiers clients.
+- Valider les autorisations, le domaine expéditeur Resend, la liste IP réseau TiDB et un scénario de demande de bout en bout avec un compte de test.

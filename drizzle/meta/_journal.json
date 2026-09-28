@@ -43,6 +43,13 @@
       "when": 1790607284114,
       "tag": "0005_create_users_table",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1790612436042,
+      "tag": "0006_admin_console",
+      "breakpoints": true
     }
   ]
 }

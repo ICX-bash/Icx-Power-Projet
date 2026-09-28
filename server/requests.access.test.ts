@@ -29,10 +29,15 @@ describe("requests and notifications access", () => {
     await expect(caller.notifications.mine()).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
+    await expect(caller.admin.dashboard()).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
   });
   it("rejects admin operations for a regular user", async () => {
     const caller = appRouter.createCaller({ ...publicContext, user: { id: 7, openId: "regular", email: "client@example.com", name: "Client", role: "user" } as any });
     await expect(caller.admin.users()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.admin.dashboard()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.admin.files()).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller.auth.isSuperAdmin()).resolves.toBe(false);
     await expect(caller.requests.updateStatus({ id: 1, status: "Accepté" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });

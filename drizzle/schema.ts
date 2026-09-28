@@ -46,6 +46,9 @@ export const serviceRequests = mysqlTable("serviceRequests", {
   message: text("message"),
   attachmentCount: int("attachmentCount").default(0).notNull(),
   status: mysqlEnum("status", ["Reçu", "En cours d’analyse", "Documents complémentaires requis", "Accepté", "Refusé", "Clôturé"]).default("Reçu").notNull(),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  assignedAdminEmail: varchar("assignedAdminEmail", { length: 320 }),
+  adminNotes: text("adminNotes"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -61,7 +64,6 @@ export const serviceDocuments = mysqlTable("serviceDocuments", {
   fileSize: int("fileSize").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
-
 
 export const userNotifications = mysqlTable("userNotifications", {
   id: int("id").autoincrement().primaryKey(),
@@ -117,6 +119,24 @@ export const auditLogs = mysqlTable("auditLogs", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const integrationTokens = mysqlTable("integrationTokens", {
+  provider: varchar("provider", { length: 40 }).primaryKey(),
+  accountEmail: varchar("accountEmail", { length: 320 }).notNull(),
+  encryptedRefreshToken: text("encryptedRefreshToken").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const emailLogs = mysqlTable("emailLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  recipient: varchar("recipient", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  provider: varchar("provider", { length: 40 }).notNull(),
+  providerMessageId: varchar("providerMessageId", { length: 180 }),
+  status: mysqlEnum("status", ["sent", "failed", "skipped"]).default("sent").notNull(),
+  error: text("error"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type University = typeof universities.$inferSelect;
@@ -127,3 +147,5 @@ export type ApplicationCase = typeof applicationCases.$inferSelect;
 export type WorkflowProgress = typeof workflowProgress.$inferSelect;
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type PartnershipRequest = typeof partnershipRequests.$inferSelect;
+export type IntegrationToken = typeof integrationTokens.$inferSelect;
+export type EmailLog = typeof emailLogs.$inferSelect;

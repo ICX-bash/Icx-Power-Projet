@@ -30,4 +30,15 @@ describe("requests and notifications access", () => {
       code: "UNAUTHORIZED",
     });
   });
+  it("rejects admin operations for a regular user", async () => {
+    const caller = appRouter.createCaller({ ...publicContext, user: { id: 7, openId: "regular", email: "client@example.com", name: "Client", role: "user" } as any });
+    await expect(caller.admin.users()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.requests.updateStatus({ id: 1, status: "Accepté" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("recognizes the configured principal super-admin", async () => {
+    const caller = appRouter.createCaller({ ...publicContext, user: { id: 1, openId: "principal", email: "ICXPS.SALE@OUTLOOK.COM", name: "ICX Principal", role: "admin" } as any });
+    await expect(caller.admin.users()).resolves.toEqual(expect.any(Array));
+  });
+
 });

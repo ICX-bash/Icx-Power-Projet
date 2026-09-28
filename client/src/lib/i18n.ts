@@ -16,7 +16,7 @@ export type SiteCopy = {
   addDocuments: string; documentHint: string; saveRequest: string; saving: string; maxFiles: string;
   serviceOverview: string; serviceMethodTitle: string; serviceMethodBody: string; startRequest: string;
   studiesEyebrow: string; studiesTitle: string; studiesBody: string; searchStudies: string; universities: string; programmes: string;
-  allCountries: string; allLevels: string; results: string; reset: string; noStudyResults: string; contactIcx: string;
+  allCountries: string; allLevels: string; results: string; reset: string; noStudyResults: string; contactIcx: string; workflowPlaceholder?: string;
 };
 
 const fr: SiteCopy = {
@@ -35,12 +35,12 @@ export const siteCopy: Record<Locale, SiteCopy> = { fr, en, zh, ro, pl, ar };
 
 
 export const localeOptions: Array<{ code: Locale; label: string; nativeLabel: string }> = [
-  { code: "fr", label: "Français", nativeLabel: "Français" },
-  { code: "en", label: "English", nativeLabel: "English" },
-  { code: "ro", label: "Roumain", nativeLabel: "Română" },
-  { code: "pl", label: "Polonais", nativeLabel: "Polski" },
-  { code: "ar", label: "Arabe", nativeLabel: "العربية" },
-  { code: "zh", label: "Chinois", nativeLabel: "中文" },
+  { code: "fr", label: "Français", nativeLabel: "fr" },
+  { code: "en", label: "English", nativeLabel: "En" },
+  { code: "ro", label: "Roumain", nativeLabel: "Ro" },
+  { code: "pl", label: "Polonais", nativeLabel: "Pl" },
+  { code: "ar", label: "Arabe", nativeLabel: "Ar" },
+  { code: "zh", label: "Chinois", nativeLabel: "Zh" },
 ];
 
 export const isLocale = (value: string | null): value is Locale => Boolean(value && localeOptions.some(option => option.code === value));

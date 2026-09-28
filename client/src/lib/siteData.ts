@@ -161,6 +161,31 @@ export const serviceTranslations: Record<Locale, Record<string, { label: string;
   ar: {},
 };
 
+// Complete localized surfaces for the two services that expose the widest set of
+// tabs and workflow choices. They intentionally do not fall back to English.
+const travelAndAffiliateTranslations = {
+  ro: {
+    "voyage-tourisme": { label: "Călătorii și turism", eyebrow: "08 / mobilitate și ospitalitate", description: "Organizăm deplasări, sejururi și experiențe turistice în Africa.", tabs: ["Prezentare", "Bilete de avion", "Hoteluri și sejururi", "Consultanță turistică", "Contact"], outcomes: ["Bilete de avion", "Hoteluri în Africa", "Consultanță turistică"] },
+    "affiliation-produits": { label: "Afiliere și produse", eyebrow: "09 / comerț conectat", description: "Descoperiți produse de la diferite branduri prin portalul ICX.", tabs: ["Prezentare", "Branduri", "Linkuri afiliate", "Comenzi și urmărire", "Deveniți partener"], outcomes: ["Legături cu branduri", "Catalog de redirecționare", "Trasabilitatea partenerilor"] },
+  },
+  pl: {
+    "voyage-tourisme": { label: "Podróże i turystyka", eyebrow: "08 / mobilność i gościnność", description: "Organizujemy podróże, pobyty i doświadczenia turystyczne w Afryce.", tabs: ["Prezentacja", "Bilety lotnicze", "Hotele i pobyty", "Doradztwo turystyczne", "Kontakt"], outcomes: ["Bilety lotnicze", "Hotele w Afryce", "Doradztwo turystyczne"] },
+    "affiliation-produits": { label: "Afiliacja i produkty", eyebrow: "09 / połączony handel", description: "Poznawaj produkty różnych marek za pośrednictwem portalu ICX.", tabs: ["Prezentacja", "Marki", "Linki afiliacyjne", "Zamówienia i śledzenie", "Zostań partnerem"], outcomes: ["Linki do marek", "Katalog przekierowań", "Identyfikowalność partnerów"] },
+  },
+  ar: {
+    "voyage-tourisme": { label: "السفر والسياحة", eyebrow: "08 / التنقل والضيافة", description: "ننظم الرحلات والإقامات والتجارب السياحية في أفريقيا.", tabs: ["نظرة عامة", "تذاكر الطيران", "الفنادق والإقامات", "الاستشارات السياحية", "تواصل معنا"], outcomes: ["تذاكر الطيران", "فنادق في أفريقيا", "استشارات سياحية"] },
+    "affiliation-produits": { label: "التسويق بالعمولة والمنتجات", eyebrow: "09 / تجارة متصلة", description: "اكتشف منتجات العلامات المختلفة عبر بوابة ICX.", tabs: ["نظرة عامة", "العلامات التجارية", "روابط الإحالة", "الطلبات والمتابعة", "كن شريكاً"], outcomes: ["روابط العلامات التجارية", "كتالوج إعادة التوجيه", "تتبع الشركاء"] },
+  },
+  zh: {
+    "voyage-tourisme": { label: "旅行与旅游", eyebrow: "08 / 出行与待客", description: "组织非洲旅行、住宿和旅游体验。", tabs: ["概览", "机票", "酒店与住宿", "旅游咨询", "联系我们"], outcomes: ["机票", "非洲酒店", "旅游咨询"] },
+    "affiliation-produits": { label: "联盟与产品", eyebrow: "09 / 连接型商业", description: "通过 ICX 门户发现不同品牌的产品。", tabs: ["概览", "品牌", "联盟链接", "订单与跟踪", "成为合作伙伴"], outcomes: ["品牌链接", "跳转目录", "合作伙伴可追溯性"] },
+  },
+} as const;
+Object.assign(serviceTranslations.ro, travelAndAffiliateTranslations.ro);
+Object.assign(serviceTranslations.pl, travelAndAffiliateTranslations.pl);
+Object.assign(serviceTranslations.ar, travelAndAffiliateTranslations.ar);
+Object.assign(serviceTranslations.zh, travelAndAffiliateTranslations.zh);
+
 // Every locale has a non-French service surface; locales still being expanded use
 // the complete English service vocabulary rather than silently reverting to French.
 for (const locale of Object.keys(serviceTranslations) as Locale[]) {

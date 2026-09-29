@@ -15,6 +15,7 @@ function Router() {
     <Route path="/services/:slug" component={Home} />
     <Route path="/etudes" component={Home} />
     <Route path="/partenaires" component={Home} />
+    <Route path="/contact" component={Home} />
     <Route path="/mon-espace" component={Home} />
     <Route path="/assistant" component={Assistant} />
     <Route path="/connexion" component={Home} />

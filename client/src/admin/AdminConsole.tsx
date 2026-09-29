@@ -167,6 +167,11 @@ export default function AdminConsole() {
   );
   const [requestSearch, setRequestSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Tous les statuts");
+  const [priorityFilter, setPriorityFilter] = useState("Toutes les priorités");
+  const [serviceFilter, setServiceFilter] = useState("Tous les services");
+  const [countryFilter, setCountryFilter] = useState("Tous les pays");
+  const [needFilter, setNeedFilter] = useState("");
+  const [sortBy, setSortBy] = useState("recent");
   const [priorityDraft, setPriorityDraft] = useState("normal");
   const [statusDraft, setStatusDraft] =
     useState<(typeof STATUSES)[number]>("Reçu");
@@ -284,6 +289,7 @@ export default function AdminConsole() {
     onError: error =>
       toast.error(error.message || "Téléchargement impossible."),
   });
+  const deleteNotification = trpc.admin.deleteNotification.useMutation({ onSuccess: async () => { await utils.admin.notifications.invalidate(); toast.success("Notification supprimée."); }, onError: error => toast.error(error.message) });
   const sendNotification = trpc.admin.sendNotification.useMutation({
     onSuccess: async result => {
       await Promise.all([
@@ -362,12 +368,17 @@ export default function AdminConsole() {
           `${item.id} ${item.firstName} ${item.lastName} ${item.email} ${item.serviceKey}`
             .toLowerCase()
             .includes(search);
-        const matchesStatus =
-          statusFilter === "Tous les statuts" || item.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesStatus = statusFilter === "Tous les statuts" || item.status === statusFilter;
+        const matchesPriority = priorityFilter === "Toutes les priorités" || item.priority === priorityFilter;
+        const matchesService = serviceFilter === "Tous les services" || item.serviceKey === serviceFilter;
+        const matchesCountry = countryFilter === "Tous les pays" || item.country === countryFilter;
+        const matchesNeed = !needFilter.trim() || `${item.message || ""} ${item.serviceKey}`.toLowerCase().includes(needFilter.trim().toLowerCase());
+        return matchesSearch && matchesStatus && matchesPriority && matchesService && matchesCountry && matchesNeed;
       }),
-    [requestRows, requestSearch, statusFilter]
+    [requestRows, requestSearch, statusFilter, priorityFilter, serviceFilter, countryFilter, needFilter]
   );
+  const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 } as const;
+  const sortedVisibleRequests = [...visibleRequests].sort((a, b) => sortBy === "oldest" ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() : sortBy === "priority" ? (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - (priorityOrder[a.priority as keyof typeof priorityOrder] || 0) : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const selectedMail = (messages.data ?? []).find(
     raw => (raw as { id?: string }).id === selectedMailId
   ) as
@@ -841,6 +852,13 @@ export default function AdminConsole() {
                         <option key={status}>{status}</option>
                       ))}
                     </select>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <select value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option>Toutes les priorités</option>{PRIORITIES.map(priority => <option key={priority} value={priority}>{priority === "urgent" ? "Urgente" : priority === "high" ? "Haute" : priority === "low" ? "Basse" : "Normale"}</option>)}</select>
+                      <select value={serviceFilter} onChange={event => setServiceFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option>Tous les services</option>{Array.from(new Set(requestRows.map(item => item.serviceKey))).sort().map(service => <option key={service}>{service}</option>)}</select>
+                      <select value={countryFilter} onChange={event => setCountryFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option>Tous les pays</option>{Array.from(new Set(requestRows.map(item => item.country).filter(Boolean))).sort().map(country => <option key={country}>{country}</option>)}</select>
+                      <select value={sortBy} onChange={event => setSortBy(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option value="recent">Plus récentes</option><option value="priority">Priorité / urgence</option><option value="oldest">Plus anciennes</option></select>
+                    </div>
+                    <input value={needFilter} onChange={event => setNeedFilter(event.target.value)} placeholder="Besoin ou programme d’études…" className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs" />
                   </div>
                   <div className="max-h-[70vh] overflow-auto">
                     {requests.isLoading ? (
@@ -848,7 +866,7 @@ export default function AdminConsole() {
                     ) : requests.error ? (
                       <ErrorCard message="Impossible de charger les demandes. Vérifiez les migrations TiDB." />
                     ) : (
-                      visibleRequests.map(item => (
+                      sortedVisibleRequests.map(item => (
                         <button
                           key={item.id}
                           onClick={() => setSelectedRequestId(item.id)}
@@ -890,7 +908,7 @@ export default function AdminConsole() {
                         </button>
                       ))
                     )}
-                    {!requests.isLoading && visibleRequests.length === 0 && (
+                    {!requests.isLoading && sortedVisibleRequests.length === 0 && (
                       <p className="p-8 text-center text-sm text-slate-400">
                         Aucun résultat.
                       </p>
@@ -1606,6 +1624,7 @@ export default function AdminConsole() {
                           <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-600">
                             {item.content}
                           </p>
+                          <button type="button" onClick={() => deleteNotification.mutate({ id: item.id })} className="mt-3 text-xs font-bold text-rose-600 hover:underline">Supprimer la notification</button>
                         </article>
                       ))
                     )}

@@ -428,10 +428,17 @@ export async function getEmailLogs(limit = 100) {
   if (!db) return [];
   return db.select().from(emailLogs).orderBy(desc(emailLogs.createdAt)).limit(Math.min(limit, 500));
 }
+export async function getEmailLogsForRecipient(recipient: string, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({id:emailLogs.id,subject:emailLogs.subject,status:emailLogs.status,createdAt:emailLogs.createdAt,error:emailLogs.error}).from(emailLogs).where(eq(emailLogs.recipient, recipient)).orderBy(desc(emailLogs.createdAt)).limit(Math.min(limit, 100));
+}
 
 export async function deleteServiceDocument(id:number){const db=await getDb();if(!db)throw new Error("Database unavailable");await db.delete(serviceDocuments).where(eq(serviceDocuments.id,id));return {success:true} as const;}
 export async function deleteEmailLog(id:number){const db=await getDb();if(!db)throw new Error("Database unavailable");await db.delete(emailLogs).where(eq(emailLogs.id,id));return {success:true} as const;}
 export async function deleteUserAccount(id:number){const db=await getDb();if(!db)throw new Error("Database unavailable");await db.transaction(async tx=>{await tx.delete(serviceDocuments).where(eq(serviceDocuments.userId,id));await tx.delete(serviceRequests).where(eq(serviceRequests.userId,id));await tx.delete(userNotifications).where(eq(userNotifications.userId,id));await tx.delete(workflowProgress).where(eq(workflowProgress.userId,id));await tx.delete(partnershipRequests).where(eq(partnershipRequests.userId,id));await tx.delete(clientAuthAccounts).where(eq(clientAuthAccounts.userId,id));await tx.delete(users).where(eq(users.id,id));});return {success:true} as const;}
+export async function deleteUserNotification(id:number){const db=await getDb();if(!db)throw new Error("Database unavailable");await db.delete(userNotifications).where(eq(userNotifications.id,id));return {success:true} as const;}
+export async function resetWorkspaceData(scope:{documents?:boolean;requests?:boolean;notifications?:boolean;emailLogs?:boolean;workflows?:boolean;partnerships?:boolean}){const db=await getDb();if(!db)throw new Error("Database unavailable");if(scope.documents)await db.delete(serviceDocuments);if(scope.requests)await db.delete(serviceRequests);if(scope.notifications)await db.delete(userNotifications);if(scope.emailLogs)await db.delete(emailLogs);if(scope.workflows)await db.delete(workflowProgress);if(scope.partnerships)await db.delete(partnershipRequests);return {success:true} as const;}
 export async function getUsersForAdmin() {
   const db = await getDb();
   if (!db) return [];

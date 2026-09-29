@@ -8,14 +8,14 @@ import { z } from "zod";
 import {
   addAuditLog, addEmailLog, addServiceDocument, createPartnershipRequest, createServiceRequest,
   checkDatabaseConnection, createUserNotification, getAllServiceRequestsWithDocuments, getAuditLogs,
-  getEmailLogs, getPartnershipRequestsForUser, getRecentAdminNotifications,
+  getEmailLogs, getEmailLogsForRecipient, getPartnershipRequestsForUser, getRecentAdminNotifications,
   getServiceDocumentById, getServiceDocumentsForUser, getServiceRequestById,
   getServiceRequestsForUser, getUserById, getUserNotifications, getUsersForAdmin,
   clearClientLoginFailures, createClientAuthAccount, getClientAuthByEmail,
   recordClientLoginFailure, resetClientPassword, saveClientPasswordResetToken,
   updateClientVerificationToken, updateUserLastSignedIn, verifyClientEmailToken,
   getWorkflowProgressForUser, listUsers, saveWorkflowProgress, setUserRoleByEmail,
-  updateServiceRequestAdmin, updateServiceRequestStatus, deleteServiceDocument, deleteEmailLog, deleteUserAccount,
+  updateServiceRequestAdmin, updateServiceRequestStatus, deleteServiceDocument, deleteEmailLog, deleteUserAccount, deleteUserNotification, resetWorkspaceData,
 } from "./db";
 import { storagePut, storageGetSignedUrl } from "./storage";
 import { ENV } from "./_core/env";
@@ -255,7 +255,7 @@ export const appRouter = router({
       phone: z.string().max(40).optional(),
       country: z.string().max(80).optional(),
       message: z.string().min(5).max(8000),
-      attachments: z.array(z.object({ fileName: z.string().min(1).max(255), mimeType: z.string().min(1).max(120), fileSize: z.number().int().positive().max(8_000_000), data: z.string().min(1).max(11_000_000) })).max(5).optional(),
+      attachments: z.array(z.object({ fileName: z.string().min(1).max(255), mimeType: z.string().min(1).max(120), fileSize: z.number().int().positive().max(8_000_000), data: z.string().min(1).max(11_000_000) } )).max(10).optional(),
     })).mutation(async ({ ctx, input }) => {
       const attachments = input.attachments || [];
       const result = await createServiceRequest({ serviceKey: input.serviceKey, firstName: input.firstName, lastName: input.lastName, email: input.email, phone: input.phone, country: input.country, message: input.message, attachmentCount: attachments.length, userId: ctx.user.id });
@@ -322,7 +322,9 @@ export const appRouter = router({
 
   notifications: router({
     mine: protectedProcedure.query(({ ctx }) => getUserNotifications(ctx.user.id)),
+    emailHistory: protectedProcedure.query(({ ctx }) => getEmailLogsForRecipient(ctx.user.email || "")),
     sendToAdmin: protectedProcedure.input(z.object({title:z.string().min(2).max(180),content:z.string().min(2).max(4000),sendEmail:z.boolean().default(true)})).mutation(async ({ctx,input})=>{await createUserNotification({userId:ctx.user.id,title:`Message utilisateur · ${input.title}`,content:input.content});const email=await sendAndLogEmail({to:ENV.superAdminEmail,subject:`[Portail utilisateur] ${input.title}`,text:`${ctx.user.name||ctx.user.email||"Utilisateur"} (${ctx.user.email||""})\n\n${input.content}`,html:`<p><strong>${escapeHtml(ctx.user.name||ctx.user.email||"Utilisateur")}</strong> (${escapeHtml(ctx.user.email||"")})</p><p>${escapeHtml(input.content).replace(/\n/g,"<br>")}</p>`,idempotencyKey:`user-message-${ctx.user.id}-${Date.now()}`});return {success:true,emailSent:email.sent} as const;}),
+    reportUser: protectedProcedure.input(z.object({category:z.enum(["abus","fraude","contenu-inapproprie","autre"]),content:z.string().min(10).max(4000)})).mutation(async ({ctx,input})=>{const title=`Signalement utilisateur · ${input.category}`;await createUserNotification({userId:ctx.user.id,title,content:input.content});const email=await sendAndLogEmail({to:ENV.superAdminEmail,subject:`[Signalement] ${input.category}`,text:`Signalement par ${ctx.user.name||ctx.user.email||"Utilisateur"} (${ctx.user.email||""})\n\n${input.content}`,html:`<p><strong>Signalement de ${escapeHtml(ctx.user.name||ctx.user.email||"Utilisateur")}</strong> (${escapeHtml(ctx.user.email||"")})</p><p>Catégorie : ${escapeHtml(input.category)}</p><p>${escapeHtml(input.content).replace(/\n/g,"<br>")}</p>`,idempotencyKey:`report-${ctx.user.id}-${Date.now()}`});return {success:true,emailSent:email.sent} as const;}),
   }),
 
   admin: router({
@@ -407,6 +409,9 @@ export const appRouter = router({
       await logAdminAction(ctx.user!.id, "user.role.updated", "user", undefined, { email: input.email.toLowerCase(), role: input.role });
       return result;
     }),
+    createUser: superAdminProcedure.input(z.object({firstName:z.string().min(1).max(120),lastName:z.string().min(1).max(120),email:z.string().email().max(320)})).mutation(async ({ctx,input})=>{const email=normalizeEmail(input.email);if(email===ENV.superAdminEmail)throw new TRPCError({code:"FORBIDDEN",message:"Cette adresse est réservée au super-admin."});const now=new Date();const token=createOneTimeToken();const passwordHash=await hashPassword(`ICX-${crypto.randomUUID()}-Invite!`);const result=await createClientAuthAccount({email,name:`${input.firstName} ${input.lastName}`.trim(),openId:`local:${crypto.randomUUID()}`,passwordHash,verificationTokenHash:token.tokenHash,verificationExpiresAt:new Date(now.getTime()+24*60*60*1000),verificationSentAt:now,termsAcceptedAt:now,privacyAcceptedAt:now,dataProcessingAcceptedAt:now});if(!result.created)throw new TRPCError({code:"CONFLICT",message:"Un compte existe déjà avec cette adresse."});const sent=await sendVerificationEmail(ctx.req,email,`${input.firstName} ${input.lastName}`,token.token,token.tokenHash);await logAdminAction(ctx.user.id,"user.created","user",result.user?.id,{email});return {success:true,emailSent:sent.sent} as const;}),
+    deleteNotification: superAdminProcedure.input(z.object({id:z.number().int().positive()})).mutation(async ({ctx,input})=>{await deleteUserNotification(input.id);await logAdminAction(ctx.user.id,"notification.deleted","userNotification",input.id);return {success:true} as const;}),
+    resetData: superAdminProcedure.input(z.object({documents:z.boolean(),requests:z.boolean(),notifications:z.boolean(),emailLogs:z.boolean(),workflows:z.boolean(),partnerships:z.boolean()})).mutation(async ({ctx,input})=>{await resetWorkspaceData(input);await logAdminAction(ctx.user.id,"workspace.reset","workspace",undefined,input);return {success:true} as const;}),
     audit: adminProcedure.input(z.object({ entity: z.string().max(80).optional(), entityId: z.number().int().positive().optional(), limit: z.number().int().min(1).max(500).optional() }).optional()).query(({ input }) => getAuditLogs(input ?? {})),
     emailLogs: adminProcedure.query(() => getEmailLogs(150)),
     deleteEmailLog: superAdminProcedure.input(z.object({id:z.number().int().positive()})).mutation(async ({ctx,input})=>{await deleteEmailLog(input.id);await logAdminAction(ctx.user.id,"email.log.deleted","emailLog",input.id);return {success:true} as const;}),

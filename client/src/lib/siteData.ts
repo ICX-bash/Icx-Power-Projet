@@ -217,7 +217,7 @@ export const services: Service[] = [
   },
   {
     slug: "permis-travail",
-    image: "/assets/work-contracts.jpg",
+    image: "/assets/work-contracts.webp",
     architecture: "people",
     label: "Permis de travail & contrat de travail",
     shortLabel: "Permis de travail",

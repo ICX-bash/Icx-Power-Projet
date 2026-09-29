@@ -249,7 +249,7 @@ function Header({
               </kbd>
             </button>
             {searchOpen && (
-              <div className="absolute right-0 top-12 z-[70] w-[360px] rounded-2xl border border-border bg-card p-3 shadow-2xl shadow-slate-950/10">
+              <div className="absolute right-0 top-12 z-[70] w-[calc(100vw-2rem)] max-w-[360px] rounded-2xl border border-border bg-card p-3 shadow-2xl shadow-slate-950/10">
                 <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3">
                   <Search className="size-4 text-muted-foreground" />
                   <input
@@ -736,8 +736,14 @@ function Hero({
         <div className="relative min-h-[390px] lg:min-h-[470px]">
           <div className="absolute inset-0 overflow-hidden rounded-[2.2rem] border border-white/15 bg-[#27302b] shadow-[0_0_90px_rgba(183,121,31,.22)]">
             <img
-              src="/assets/hero-inclusive-entrepreneurs.png"
+              src="/assets/hero-inclusive-entrepreneurs-1600.webp"
+              srcSet="/assets/hero-inclusive-entrepreneurs-800.webp 800w, /assets/hero-inclusive-entrepreneurs-1600.webp 1600w"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 75vw, 50vw"
               alt={copy.homeTitle}
+              width={1600}
+              height={900}
+              fetchPriority="high"
+              decoding="async"
               className="h-full w-full object-cover opacity-90"
             />
             <div className="absolute inset-0 bg-gradient-to-tr from-[#1b2420]/80 via-[#34453b]/15 to-amber-300/10" />
@@ -914,7 +920,7 @@ function HomePage({
                 name="K. Marcel Traoré"
                 role={copy.direction}
                 color="bg-amber-600"
-                photo="/assets/k-marcel-traore.png"
+                photo="/assets/k-marcel-traore.webp"
                 locale={locale}
               />
               <PersonCard
@@ -960,6 +966,7 @@ function ServiceCard({
         src={service.image}
         alt={view.label}
         loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-[#17211d] via-[#17211d]/65 to-transparent" />
@@ -1024,6 +1031,8 @@ function PersonCard({
           <img
             src={photo}
             alt={name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full scale-[1.12] rounded-full object-contain object-bottom"
           />
         ) : (
@@ -1075,6 +1084,8 @@ function PartnerStrip({
           <span className="grid size-14 place-items-center overflow-hidden rounded-2xl bg-white ring-1 ring-border">
             <img
               src="/assets/lorondo-logo.jpg"
+              loading="lazy"
+              decoding="async"
               alt="Logo Lorondo Services SRL"
               className="size-full object-contain p-1"
             />
@@ -1096,6 +1107,8 @@ function PartnerStrip({
           >
             <img
               src="/assets/aaft-official.jpg"
+              loading="lazy"
+              decoding="async"
               alt="Logo officiel AAFT"
               className="size-full object-cover"
             />
@@ -2477,8 +2490,10 @@ function WorkPermitWorkflow({
         </button>
         <div className="relative overflow-hidden border-b border-border bg-[#1d2521] p-7 pr-16 text-white sm:p-9">
           <img
-            src="/assets/work-contracts.jpg"
+            src="/assets/work-contracts.webp"
             alt="Signature de documents professionnels"
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover opacity-20"
           />
           <div className="absolute inset-0 bg-[#142019]/75" />
@@ -2970,6 +2985,8 @@ function ServicePage({
             src={service.image}
             alt=""
             aria-hidden="true"
+            fetchPriority="high"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover opacity-20"
           />
           <div className="absolute inset-0 bg-[#142019]/80" />
@@ -3263,7 +3280,7 @@ function StudiesPage({
                   className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3 lg:flex">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex">
                 <select
                   value={catalogView}
                   onChange={event =>
@@ -3271,12 +3288,12 @@ function StudiesPage({
                       event.target.value as "programmes" | "universites"
                     )
                   }
-                  className="h-12 w-full min-w-[180px] rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none"
+                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none"
                 >
                   <option value="universites">{copy.universities}</option>
                   <option value="programmes">{copy.programmes}</option>
                 </select>
-                <div className="flex min-w-[210px] flex-1 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <Globe2 className="size-4 shrink-0 text-muted-foreground" />
                   <select
                     aria-label="Filtre pays des programmes"
@@ -3315,7 +3332,7 @@ function StudiesPage({
                 <select
                   value={level}
                   onChange={event => setLevel(event.target.value)}
-                  className="h-12 w-full min-w-[160px] rounded-xl border border-input bg-background px-3 text-sm outline-none"
+                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm outline-none"
                 >
                   <option>{copy.allLevels}</option>
                   <option>Bachelor</option>
@@ -3767,6 +3784,7 @@ function WorkspacePage({
   const emailHistory = emailHistoryQuery.data || [];
   const [adminMessageTitle, setAdminMessageTitle] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
   const [contactAppointmentAt, setContactAppointmentAt] = useState("");
   const sendToAdmin = trpc.notifications.sendToAdmin.useMutation({
     onSuccess: r => {
@@ -3788,7 +3806,7 @@ function WorkspacePage({
           ? "ICX a bien reçu votre signalement; l’accusé a été envoyé par e-mail."
           : "Votre signalement a été enregistré, mais l’accusé e-mail n’a pas pu être envoyé."
       );
-      setAdminMessage("");
+      setReportMessage("");
     },
     onError: e => toast.error(e.message),
   });
@@ -4121,7 +4139,7 @@ function WorkspacePage({
                     e.preventDefault();
                     reportUser.mutate({
                       category: "autre",
-                      content: adminMessage,
+                      content: reportMessage,
                     });
                   }}
                   className="flex flex-col gap-3 sm:flex-row"
@@ -4129,8 +4147,8 @@ function WorkspacePage({
                   <textarea
                     required
                     minLength={10}
-                    value={adminMessage}
-                    onChange={e => setAdminMessage(e.target.value)}
+                    value={reportMessage}
+                    onChange={e => setReportMessage(e.target.value)}
                     placeholder="Décrire le problème observé…"
                     className="min-h-20 flex-1 rounded-xl border border-input bg-background px-4 py-3 text-sm"
                   />
@@ -5589,6 +5607,8 @@ function InfoPage({
                   <div className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border">
                     <img
                       src="/assets/lorondo-logo.jpg"
+                      loading="lazy"
+                      decoding="async"
                       alt="Logo Lorondo Services SRL"
                       className="size-full object-contain p-1"
                     />
@@ -5607,6 +5627,8 @@ function InfoPage({
                   <div className="flex size-12 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-border">
                     <img
                       src="/assets/aaft-official.jpg"
+                      loading="lazy"
+                      decoding="async"
                       alt="Logo officiel AAFT"
                       className="size-full object-cover"
                     />

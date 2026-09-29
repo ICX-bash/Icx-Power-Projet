@@ -2,7 +2,11 @@ const forgeApiUrl = (process.env.BUILT_IN_FORGE_API_URL ?? "").trim();
 const forgeApiKey = (process.env.BUILT_IN_FORGE_API_KEY ?? "").trim();
 const openAiApiBase = (process.env.OPENAI_API_BASE ?? "").trim();
 const openAiApiKey = (process.env.OPENAI_API_KEY ?? "").trim();
-const useForgeForLlm = Boolean(forgeApiKey);
+const geminiApiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+const geminiModel = (process.env.GEMINI_MODEL ?? "gemini-3.8-flash").trim();
+const isUsableApiKey = (value: string) =>
+  Boolean(value) && !/^(REMPLACEZ|VOTRE_|YOUR_|<)/i.test(value);
+const useForgeForLlm = isUsableApiKey(forgeApiKey);
 
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
@@ -26,5 +30,12 @@ export const ENV = {
     ? forgeApiUrl || "https://forge.manus.im"
     : openAiApiBase ||
       (openAiApiKey ? "https://api.openai.com/v1" : "https://forge.manus.im"),
-  llmApiKey: useForgeForLlm ? forgeApiKey : openAiApiKey,
+  llmApiKey: useForgeForLlm
+    ? forgeApiKey
+    : isUsableApiKey(openAiApiKey)
+      ? openAiApiKey
+      : "",
+  // Optional direct Google AI Studio fallback. This secret is server-only.
+  geminiApiKey: isUsableApiKey(geminiApiKey) ? geminiApiKey : "",
+  geminiModel,
 };

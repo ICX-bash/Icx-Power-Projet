@@ -29,12 +29,22 @@ La connexion client n’a besoin ni de `VITE_APP_ID`, ni de `VITE_OAUTH_PORTAL_U
 ## Variables principales
 
 - **Base et sessions** : `DATABASE_URL`, `DATABASE_SSL`, `JWT_SECRET`, `NEXT_PUBLIC_SITE_URL`.
-- **Assistant IA** : fournissez les identifiants serveur Manus Forge (`BUILT_IN_FORGE_API_KEY`, avec l’URL Forge si elle est personnalisée), ou une clé `OPENAI_API_KEY` avec éventuellement `OPENAI_API_BASE`. Le modèle GPT-5 est appelé uniquement côté serveur.
+- **Assistant IA** : GPT-5 est essayé en premier avec les identifiants serveur Manus Forge (`BUILT_IN_FORGE_API_KEY`, avec l’URL Forge si elle est personnalisée) ou OpenAI-compatible (`OPENAI_API_KEY` et éventuellement `OPENAI_API_BASE`). Si cette requête échoue, l’application peut basculer vers Gemini via `GEMINI_API_KEY`; Gemini seul suffit aussi si aucune clé primaire n’est configurée. Vérifiez `/healthz` : `assistantReady` doit être `true`.
 - **Console Microsoft admin** : `SUPER_ADMIN_EMAIL`, `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `INTEGRATION_ENCRYPTION_KEY`.
 - **Courriels** : `BREVO_API_KEY`, `BREVO_FROM_NAME`, `BREVO_FROM_EMAIL`, `BREVO_REPLY_TO`.
 - **Fichiers** : `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`.
 
 Ne commitez jamais de secrets. Les variables `VITE_*` sont intégrées au bundle client; n’y mettez jamais de secret.
+
+Le free tier de l’API Gemini est limité et Google précise que son contenu peut être utilisé pour améliorer ses produits. Ne l’activez pas pour traiter des renseignements personnels ou des dossiers confidentiels sans avoir vérifié les conditions de confidentialité et obtenu les accords nécessaires; une offre payante peut appliquer des conditions différentes.
+
+### Activer le repli gratuit Gemini dans Render
+
+1. Créez une clé depuis [Google AI Studio](https://aistudio.google.com/apikey), en vérifiant les conditions de l’offre gratuite et son traitement des données.
+2. Dans **Render → service ICX → Environment**, ajoutez `GEMINI_API_KEY` avec la clé obtenue et `GEMINI_MODEL` avec `gemini-3.8-flash`. Ne publiez jamais la clé sur GitHub, dans un message ou dans une variable `VITE_*`.
+3. Enregistrez les variables et laissez Render redémarrer/redéployer le service.
+4. Ouvrez `https://VOTRE-DOMAINE/healthz` : `assistantReady` doit afficher `true`. Cela confirme qu’une clé a été configurée, pas que Google ou le fournisseur primaire est joignable à cet instant.
+5. Testez une question non sensible dans l’assistant. Si les deux fournisseurs échouent, consultez les logs Render pour le statut amont, sans copier de secret dans une conversation.
 
 ## Vérifications locales
 

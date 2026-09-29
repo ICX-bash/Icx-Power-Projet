@@ -11,6 +11,7 @@ import {
   superAdminProcedure,
 } from "./_core/trpc";
 import { invokeLLM } from "./_core/llm";
+import { invokeGeminiChat } from "./_core/gemini";
 import { z } from "zod";
 import {
   addAuditLog,
@@ -1407,39 +1408,62 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        try {
-          const result = await invokeLLM({
-            model: "gpt-5",
-            reasoning: { effort: "medium" },
-            maxCompletionTokens: 1200,
-            messages: [
-              {
-                role: "system",
-                content: `Tu es ICX Intelligence, l'assistant officiel indépendant d'ICX POWER SOLUTIONS SRL. Tu réponds en français par défaut, mais tu peux répondre en anglais, roumain, polonais, chinois ou arabe si l'utilisateur le demande. Comprends l'objectif, pose au maximum deux questions de clarification si nécessaire, puis réponds avec une structure lisible : analyse, options, documents ou informations utiles, risques/points à confirmer, prochaine action. Ne fabrique jamais une université, un visa, un prix, une règle légale ou une disponibilité. Quand une information doit être confirmée, indique-le clairement. Pour les demandes sensibles, donne uniquement des informations générales et recommande un professionnel qualifié. Pour ICX, propose une prochaine étape concrète : choisir un service, ouvrir un espace sécurisé, contacter ICX ou commencer une demande.\n\n${icxKnowledgeBase}`,
-              },
-              ...input.messages,
-            ],
-          });
-          const content = result.choices[0]?.message?.content;
-          return {
-            content:
-              typeof content === "string" && content.trim()
-                ? content
-                : "Je n'ai pas pu formuler une réponse. Contactez ICX pour un accompagnement direct.",
-          };
-        } catch (error) {
-          console.error("[ai.chat] LLM provider request failed", {
-            error:
-              error instanceof Error
-                ? error.message.slice(0, 400)
-                : "Unknown error",
-          });
-          throw new TRPCError({
-            code: "SERVICE_UNAVAILABLE",
-            message:
-              "ICX Intelligence est momentanément indisponible. Réessayez dans quelques instants.",
-          });
+        const systemPrompt = `Tu es ICX Intelligence, l'assistant officiel indépendant d'ICX POWER SOLUTIONS SRL. Tu réponds en français par défaut, mais tu peux répondre en anglais, roumain, polonais, chinois ou arabe si l'utilisateur le demande. Comprends l'objectif, pose au maximum deux questions de clarification si nécessaire, puis réponds avec une structure lisible : analyse, options, documents ou informations utiles, risques/points à confirmer, prochaine action. Ne fabrique jamais une université, un visa, un prix, une règle légale ou une disponibilité. Quand une information doit être confirmée, indique-le clairement. Pour les demandes sensibles, donne uniquement des informations générales et recommande un professionnel qualifié. Pour ICX, propose une prochaine étape concrète : choisir un service, ouvrir un espace sécurisé, contacter ICX ou commencer une demande.\n\n${icxKnowledgeBase}`;
+        const messages = input.messages;
+        const getAnswer = (content: unknown) =>
+          typeof content === "string" && content.trim() ? content : undefined;
+
+        if (ENV.llmApiKey.trim()) {
+          try {
+            const result = await invokeLLM({
+              model: "gpt-5",
+              reasoning: { effort: "medium" },
+              maxCompletionTokens: 1200,
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...messages,
+              ],
+            });
+            const answer = getAnswer(result.choices[0]?.message?.content);
+            if (answer) return { content: answer };
+            throw new Error("Primary LLM returned an empty answer");
+          } catch (error) {
+            console.warn("[ai.chat] Primary LLM failed; checking fallback", {
+              error:
+                error instanceof Error
+                  ? error.message.slice(0, 200)
+                  : "Unknown error",
+            });
+          }
         }
+
+        if (ENV.geminiApiKey.trim()) {
+          try {
+            const answer = await invokeGeminiChat({
+              systemPrompt,
+              messages,
+              maxOutputTokens: 1200,
+            });
+            return { content: answer };
+          } catch (error) {
+            console.error("[ai.chat] Gemini fallback failed", {
+              error:
+                error instanceof Error
+                  ? error.message.slice(0, 200)
+                  : "Unknown error",
+            });
+          }
+        }
+
+        console.error("[ai.chat] No working provider is configured", {
+          primaryConfigured: Boolean(ENV.llmApiKey.trim()),
+          geminiConfigured: Boolean(ENV.geminiApiKey.trim()),
+        });
+        throw new TRPCError({
+          code: "SERVICE_UNAVAILABLE",
+          message:
+            "ICX Intelligence est momentanément indisponible. Réessayez dans quelques instants.",
+        });
       }),
   }),
 });

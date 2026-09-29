@@ -29,6 +29,7 @@ La connexion client n’a besoin ni de `VITE_APP_ID`, ni de `VITE_OAUTH_PORTAL_U
 ## Variables principales
 
 - **Base et sessions** : `DATABASE_URL`, `DATABASE_SSL`, `JWT_SECRET`, `NEXT_PUBLIC_SITE_URL`.
+- **Assistant IA** : fournissez les identifiants serveur Manus Forge (`BUILT_IN_FORGE_API_KEY`, avec l’URL Forge si elle est personnalisée), ou une clé `OPENAI_API_KEY` avec éventuellement `OPENAI_API_BASE`. Le modèle GPT-5 est appelé uniquement côté serveur.
 - **Console Microsoft admin** : `SUPER_ADMIN_EMAIL`, `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `INTEGRATION_ENCRYPTION_KEY`.
 - **Courriels** : `BREVO_API_KEY`, `BREVO_FROM_NAME`, `BREVO_FROM_EMAIL`, `BREVO_REPLY_TO`.
 - **Fichiers** : `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`.

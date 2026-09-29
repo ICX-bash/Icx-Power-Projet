@@ -1407,25 +1407,39 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        const result = await invokeLLM({
-          model: "gpt-5",
-          reasoning: { effort: "medium" },
-          maxTokens: 1200,
-          messages: [
-            {
-              role: "system",
-              content: `Tu es ICX Intelligence, l'assistant officiel indépendant d'ICX POWER SOLUTIONS SRL. Tu réponds en français par défaut, mais tu peux répondre en anglais, roumain, polonais, chinois ou arabe si l'utilisateur le demande. Comprends l'objectif, pose au maximum deux questions de clarification si nécessaire, puis réponds avec une structure lisible : analyse, options, documents ou informations utiles, risques/points à confirmer, prochaine action. Ne fabrique jamais une université, un visa, un prix, une règle légale ou une disponibilité. Quand une information doit être confirmée, indique-le clairement. Pour les demandes sensibles, donne uniquement des informations générales et recommande un professionnel qualifié. Pour ICX, propose une prochaine étape concrète : choisir un service, ouvrir un espace sécurisé, contacter ICX ou commencer une demande.\n\n${icxKnowledgeBase}`,
-            },
-            ...input.messages,
-          ],
-        });
-        const content = result.choices[0]?.message?.content;
-        return {
-          content:
-            typeof content === "string"
-              ? content
-              : "Je n'ai pas pu formuler une réponse. Contactez ICX pour un accompagnement direct.",
-        };
+        try {
+          const result = await invokeLLM({
+            model: "gpt-5",
+            reasoning: { effort: "medium" },
+            maxCompletionTokens: 1200,
+            messages: [
+              {
+                role: "system",
+                content: `Tu es ICX Intelligence, l'assistant officiel indépendant d'ICX POWER SOLUTIONS SRL. Tu réponds en français par défaut, mais tu peux répondre en anglais, roumain, polonais, chinois ou arabe si l'utilisateur le demande. Comprends l'objectif, pose au maximum deux questions de clarification si nécessaire, puis réponds avec une structure lisible : analyse, options, documents ou informations utiles, risques/points à confirmer, prochaine action. Ne fabrique jamais une université, un visa, un prix, une règle légale ou une disponibilité. Quand une information doit être confirmée, indique-le clairement. Pour les demandes sensibles, donne uniquement des informations générales et recommande un professionnel qualifié. Pour ICX, propose une prochaine étape concrète : choisir un service, ouvrir un espace sécurisé, contacter ICX ou commencer une demande.\n\n${icxKnowledgeBase}`,
+              },
+              ...input.messages,
+            ],
+          });
+          const content = result.choices[0]?.message?.content;
+          return {
+            content:
+              typeof content === "string" && content.trim()
+                ? content
+                : "Je n'ai pas pu formuler une réponse. Contactez ICX pour un accompagnement direct.",
+          };
+        } catch (error) {
+          console.error("[ai.chat] LLM provider request failed", {
+            error:
+              error instanceof Error
+                ? error.message.slice(0, 400)
+                : "Unknown error",
+          });
+          throw new TRPCError({
+            code: "SERVICE_UNAVAILABLE",
+            message:
+              "ICX Intelligence est momentanément indisponible. Réessayez dans quelques instants.",
+          });
+        }
       }),
   }),
 });

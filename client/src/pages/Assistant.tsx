@@ -130,6 +130,7 @@ export default function Assistant() {
     chat.mutate({
       messages: nextMessages
         .filter(message => message.role !== "system")
+        .slice(-20)
         .map(message => ({
           role: message.role as "user" | "assistant",
           content: message.content,

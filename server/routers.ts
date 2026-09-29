@@ -46,6 +46,17 @@ async function sendAndLogEmail(input: { to: string; subject: string; text: strin
   return result;
 }
 
+function requireEmailSent(result: Awaited<ReturnType<typeof sendTransactionalEmail>>) {
+  if (!result.sent) {
+    console.error("[Email] Transactional email was not sent:", result.error || "unknown provider error");
+    throw new TRPCError({
+      code: "SERVICE_UNAVAILABLE",
+      message: "Le compte a été enregistré, mais le lien de confirmation n’a pas pu être envoyé. L’administrateur doit configurer le service e-mail, puis vous pourrez demander un nouveau lien.",
+    });
+  }
+  return result;
+}
+
 async function logAdminAction(actorId: number, action: string, entity: string, entityId?: number, details?: unknown) {
   try {
     await addAuditLog({ actorId, action, entity, entityId: entityId ?? null, details: details === undefined ? null : JSON.stringify(details) });
@@ -151,13 +162,13 @@ export const appRouter = router({
       }
       if (!result.user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Le compte n’a pas pu être créé. Réessayez." });
       if (result.created) {
-        await sendVerificationEmail(ctx.req, email, name, token, tokenHash);
+        requireEmailSent(await sendVerificationEmail(ctx.req, email, name, token, tokenHash));
       } else if (result.account && !result.account.emailVerifiedAt) {
         const lastSent = result.account.verificationSentAt?.getTime() ?? 0;
         if (!lastSent || now.getTime() - lastSent >= 60_000) {
           const replacement = createOneTimeToken();
           await updateClientVerificationToken(result.user.id, replacement.tokenHash, new Date(now.getTime() + 24 * 60 * 60 * 1000), now);
-          await sendVerificationEmail(ctx.req, email, result.user.name || name, replacement.token, replacement.tokenHash);
+          requireEmailSent(await sendVerificationEmail(ctx.req, email, result.user.name || name, replacement.token, replacement.tokenHash));
         }
       }
       return { success: true } as const;
@@ -197,7 +208,7 @@ export const appRouter = router({
       if (lastSent && now.getTime() - lastSent < 60_000) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Attendez une minute avant de redemander le lien." });
       const { token, tokenHash } = createOneTimeToken();
       await updateClientVerificationToken(record.user.id, tokenHash, new Date(now.getTime() + 24 * 60 * 60 * 1000), now);
-      await sendVerificationEmail(ctx.req, email, record.user.name || email, token, tokenHash);
+      requireEmailSent(await sendVerificationEmail(ctx.req, email, record.user.name || email, token, tokenHash));
       return { success: true } as const;
     }),
     verifyEmail: publicProcedure.input(z.object({ token: z.string().min(20).max(256) })).mutation(async ({ ctx, input }) => {
@@ -216,7 +227,7 @@ export const appRouter = router({
       if (lastSent && now.getTime() - lastSent < 60_000) return { success: true } as const;
       const { token, tokenHash } = createOneTimeToken();
       await saveClientPasswordResetToken(record.user.id, tokenHash, new Date(now.getTime() + 30 * 60 * 1000), now);
-      await sendPasswordResetEmail(ctx.req, email, record.user.name || email, token, tokenHash);
+      requireEmailSent(await sendPasswordResetEmail(ctx.req, email, record.user.name || email, token, tokenHash));
       return { success: true } as const;
     }),
     resetPassword: publicProcedure.input(z.object({ token: z.string().min(20).max(256), password: z.string().min(12).max(128) })).mutation(async ({ ctx, input }) => {

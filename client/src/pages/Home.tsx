@@ -400,13 +400,34 @@ function Header({
             </>
           )}
         </div>
-        <button
-          className="grid size-10 place-items-center rounded-full border border-border lg:hidden"
-          onClick={() => setMenuOpen(prev => !prev)}
-          aria-label={copy.openMenu}
-        >
-          {menuOpen ? <X /> : <Menu />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex h-10 items-center gap-1 rounded-full border border-border bg-card px-2">
+            <Languages
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <select
+              aria-label={copy.chooseLanguage}
+              value={locale}
+              onChange={event => setLocale(event.target.value as Locale)}
+              className="w-[76px] bg-transparent text-[11px] font-semibold outline-none"
+            >
+              {localeOptions.map(option => (
+                <option key={option.code} value={option.code}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="grid size-10 place-items-center rounded-full border border-border"
+            onClick={() => setMenuOpen(prev => !prev)}
+            aria-label={copy.openMenu}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X /> : <Menu />}
+          </button>
+        </div>
       </div>
       {menuOpen && (
         <div className="border-t border-border bg-background px-4 py-4 lg:hidden">

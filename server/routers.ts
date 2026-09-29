@@ -265,7 +265,7 @@ export const appRouter = router({
         const stored = await storagePut(`${ctx.user.id}-documents/${safeName}`, buffer, attachment.mimeType);
         await addServiceDocument({ userId: ctx.user.id, requestId: result.id, fileName: safeName, fileKey: stored.key, fileUrl: stored.url, mimeType: attachment.mimeType, fileSize: attachment.fileSize });
       }
-      await createUserNotification({ userId: ctx.user.id, title: "Demande enregistrée", content: `Votre demande pour ${input.serviceKey} a bien été reçue par ICX.` });
+      await createUserNotification({ userId: ctx.user.id, title: `Nouvelle demande à traiter · #${result.id}`, content: `Service : ${input.serviceKey}. Demandeur : ${input.firstName} ${input.lastName}. Pays de résidence : ${input.country || "non précisé"}. Pièces jointes : ${attachments.length ? attachments.map(file => safeFileName(file.fileName)).join(", ") : "aucune"}. Le dossier est disponible dans la console super-admin.` });
       const ownerEmail = ENV.superAdminEmail;
       const adminMail = await sendAndLogEmail({
         to: ownerEmail,
@@ -307,15 +307,14 @@ export const appRouter = router({
 
   partnerships: router({
     mine: protectedProcedure.query(({ ctx }) => getPartnershipRequestsForUser(ctx.user.id)),
-    create: protectedProcedure.input(z.object({ companyName: z.string().min(2).max(180), contactName: z.string().min(2).max(160), email: z.string().email(), phone: z.string().max(40).optional(), needs: z.string().min(10).max(8000) })).mutation(async ({ ctx, input }) => {
-      const result = await createPartnershipRequest({ ...input, userId: ctx.user.id });
-      await sendAndLogEmail({
-        to: ENV.superAdminEmail,
-        subject: "Nouvelle demande de partenariat ICX",
-        text: `${input.companyName} souhaite étudier un partenariat. Contact : ${input.contactName} (${input.email}).`,
-        html: `<p><strong>${escapeHtml(input.companyName)}</strong> souhaite étudier un partenariat avec ICX.</p><p>Contact : ${escapeHtml(input.contactName)} · ${escapeHtml(input.email)}</p>`,
-        idempotencyKey: `partnership-${ctx.user.id}-${Date.now()}`,
-      });
+    create: protectedProcedure.input(z.object({ companyName: z.string().min(2).max(180), contactName: z.string().min(2).max(160), email: z.string().email(), phone: z.string().max(40).optional(), country: z.string().max(80).optional(), needs: z.string().min(10).max(8000), attachments: z.array(z.object({ fileName: z.string().min(1).max(255), mimeType: z.string().min(1).max(120), fileSize: z.number().int().positive().max(8_000_000), data: z.string().min(1).max(11_000_000) })).max(10).optional() })).mutation(async ({ ctx, input }) => {
+      const attachments = input.attachments || [];
+      const [firstName, ...lastParts] = input.contactName.trim().split(/\s+/);
+      const serviceRequest = await createServiceRequest({ userId: ctx.user.id, serviceKey: "partenariat", firstName: firstName || input.contactName, lastName: lastParts.join(" ") || "Partenaire", email: input.email, phone: input.phone, country: input.country, message: input.needs, attachmentCount: attachments.length });
+      for (const attachment of attachments) { const safeName = safeFileName(attachment.fileName); const buffer = Buffer.from(attachment.data, "base64"); const stored = await storagePut(`${ctx.user.id}-partnership-documents/${safeName}`, buffer, attachment.mimeType); await addServiceDocument({ userId: ctx.user.id, requestId: serviceRequest.id, fileName: safeName, fileKey: stored.key, fileUrl: stored.url, mimeType: attachment.mimeType, fileSize: attachment.fileSize }); }
+      const result = await createPartnershipRequest({ companyName: input.companyName, contactName: input.contactName, email: input.email, phone: input.phone, needs: `${input.country ? `[Pays de résidence: ${input.country}] ` : ""}${input.needs}`, userId: ctx.user.id });
+      await createUserNotification({ userId: ctx.user.id, title: `Partenariat reçu · dossier #${serviceRequest.id}`, content: `Votre proposition de partenariat a été reçue. ${attachments.length} pièce(s) jointe(s) transmise(s).` });
+      await sendAndLogEmail({ to: ENV.superAdminEmail, subject: `Nouveau partenariat ICX · dossier #${serviceRequest.id}`, text: `${input.companyName} souhaite étudier un partenariat. Contact : ${input.contactName} (${input.email}). Pays : ${input.country || "non précisé"}. Pièces jointes : ${attachments.length}.`, html: `<p><strong>${escapeHtml(input.companyName)}</strong> souhaite étudier un partenariat avec ICX.</p><p>Contact : ${escapeHtml(input.contactName)} · ${escapeHtml(input.email)} · Pays : ${escapeHtml(input.country || "non précisé")}</p><p>Dossier #${serviceRequest.id} · Documents : ${attachments.length}</p>`, idempotencyKey: `partnership-${ctx.user.id}-${Date.now()}` });
       return result;
     }),
   }),

@@ -3,17 +3,14 @@ import { getServiceDocumentByFileKey } from "../db";
 import { sdk } from "./sdk";
 import { getMicrosoftAdminSessionUser } from "./microsoftAdmin";
 import { ENV } from "./env";
+import { localStoragePath } from "../storage";
+import fs from "node:fs/promises";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
     const key = (req.params as Record<string, string>)[0];
     if (!key || key.includes("..") || key.includes("\\")) {
       res.status(404).send("Document introuvable");
-      return;
-    }
-
-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      res.status(503).send("Stockage des documents non configuré");
       return;
     }
 
@@ -30,6 +27,20 @@ export function registerStorageProxy(app: Express) {
         return;
       }
 
+      // Local fallback files are served directly when Forge is unavailable or when
+      // an upload was saved locally after a Forge error.
+      try {
+        const localPath = localStoragePath(key);
+        await fs.access(localPath);
+        res.set({ "Cache-Control": "private, no-store", "Content-Type": document.mimeType, "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(document.fileName)}` });
+        res.sendFile(localPath);
+        return;
+      } catch { /* remote Forge path below */ }
+
+      if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
+        res.status(404).send("Fichier non disponible");
+        return;
+      }
       const forgeUrl = new URL("v1/storage/presign/get", ENV.forgeApiUrl.replace(/\/+$/, "") + "/");
       forgeUrl.searchParams.set("path", key);
       const forgeResp = await fetch(forgeUrl, {

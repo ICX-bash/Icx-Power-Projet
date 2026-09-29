@@ -18,10 +18,10 @@ Dans **Render Dashboard → votre Web Service → Environment**, ajoutez ou vér
 | `MICROSOFT_CLIENT_SECRET` | Secret actif créé dans Microsoft Entra; saisir directement dans Render, jamais dans Git ni dans une conversation. |
 | `MICROSOFT_REDIRECT_URI` | `https://VOTRE-DOMAINE-RENDER/api/admin/auth/callback` — doit être identique, caractère pour caractère, à l’URI Web déclarée dans l’app Microsoft. |
 | `INTEGRATION_ENCRYPTION_KEY` | Générer localement avec `openssl rand -base64 32`; coller la valeur uniquement dans Render. Ne pas la modifier après connexion Outlook sans migrer les jetons chiffrés. |
-| `RESEND_API_KEY` | Clé API Resend côté serveur. |
-| `RESEND_FROM_EMAIL` | Expéditeur appartenant à un domaine vérifié dans Resend, p. ex. `notifications@votre-domaine.com`. L’adresse personnelle `@outlook.com` n’est pas un domaine expéditeur vérifiable par ICX dans Resend. |
-| `RESEND_FROM_NAME` | `ICX Power Solutions SRL`. |
-| `RESEND_REPLY_TO` | `icxps.sale@outlook.com`. |
+| `BREVO_API_KEY` | Clé API Brevo côté serveur. |
+| `BREVO_FROM_EMAIL` | Expéditeur appartenant à un domaine vérifié dans Brevo, p. ex. `notifications@votre-domaine.com`. L’adresse personnelle `@outlook.com` n’est pas un domaine expéditeur vérifiable par ICX dans Brevo. |
+| `BREVO_FROM_NAME` | `ICX Power Solutions SRL`. |
+| `BREVO_REPLY_TO` | `icxps.sale@outlook.com`. |
 | `DATABASE_URL` | URL TiDB/MySQL du schéma ICX dédié; éviter le schéma système `sys`. Ne pas remplacer `<PASSWORD>` par un mot de passe dans Git. |
 | `DATABASE_SSL` | `true` pour TiDB Cloud via l’endpoint public (valeur déjà inscrite dans `render.yaml`). Le serveur active TLS 1.2 pour les hôtes `*.tidbcloud.com`. |
 | `BUILT_IN_FORGE_API_URL` et `BUILT_IN_FORGE_API_KEY` | Nécessaires au stockage Forge que ce projet utilise déjà pour les fichiers du portail client. |
@@ -42,9 +42,9 @@ Dans **App registrations → ICX Power Solutions Outlook → Authentication**, c
 
 La boîte personnelle Outlook doit être accédée avec des permissions déléguées par le propriétaire connecté. Les permissions Graph **Application** et leur consentement administrateur s’appliquent au scénario serveur/tenant professionnel et ne sont pas la voie retenue pour une boîte personnelle `@outlook.com`.
 
-## Resend et réception Outlook
+## Brevo et réception Outlook
 
-Le portail envoie les accusés de réception, changements de statut et notifications email via l’API Resend. Il faut une clé API valide et un domaine expéditeur vérifié dans Resend. La réception de la boîte existante `icxps.sale@outlook.com` se fait par Microsoft Graph, pas en remplaçant les MX d’un domaine dans Resend. Le panneau Outlook peut lister les messages, les dossiers, les marquer lus/non lus, les déplacer et répondre depuis le compte connecté.
+Le portail envoie les accusés de réception, changements de statut et notifications email via l’API Brevo. Il faut une clé API valide et un domaine expéditeur vérifié dans Brevo. La réception de la boîte existante `icxps.sale@outlook.com` se fait par Microsoft Graph, pas en remplaçant les MX d’un domaine dans Brevo. Le panneau Outlook peut lister les messages, les dossiers, les marquer lus/non lus, les déplacer et répondre depuis le compte connecté.
 
 ## Migrations et déploiement
 
@@ -60,7 +60,7 @@ Le portail envoie les accusés de réception, changements de statut et notificat
    ```
 
    La capture précédente affichait **“working tree clean”** et **“Everything up-to-date”** : les fichiers de cette correction n’étaient donc pas encore dans ce dépôt local; le `git push` précédent n’avait rien à envoyer.
-3. Ajoutez les variables Microsoft/Resend ci-dessus dans Render. Pour `MICROSOFT_REDIRECT_URI`, utilisez exactement le domaine public de votre service.
+3. Ajoutez les variables Microsoft/Brevo ci-dessus dans Render. Pour `MICROSOFT_REDIRECT_URI`, utilisez exactement le domaine public de votre service.
 4. Dans le dépôt Mac, vérifiez que `git status --short` montre des fichiers modifiés, puis committez et poussez :
 
    ```bash
@@ -72,7 +72,7 @@ Le portail envoie les accusés de réception, changements de statut et notificat
 5. Dans Render, lancez **Manual Deploy → Deploy latest commit** (ou vérifiez le déploiement automatique de `main`).
 6. Après le déploiement, ouvrez le **Shell** du service Render et exécutez `pnpm db:push`. Le script applique les migrations versionnées avec le pool TiDB/TLS du serveur. Vérifiez que `DATABASE_URL` utilise un schéma ICX dédié, par exemple `icx_power_solutions`, pas `sys`, et que le mot de passe est correctement encodé dans l’URL.
 7. Ouvrez `/admin`, puis **Continuer avec Microsoft** et acceptez les permissions demandées avec `icxps.sale@outlook.com`.
-8. Vérifiez dans **Système & intégrations** que Outlook, Resend, stockage et base sont marqués « Prêt » / « Connecté ». Envoyez une demande test et vérifiez la notification client, l’e-mail Resend, puis le téléchargement d’un document dans la console admin.
+8. Vérifiez dans **Système & intégrations** que Outlook, Brevo, stockage et base sont marqués « Prêt » / « Connecté ». Envoyez une demande test et vérifiez la notification client, l’e-mail Brevo, puis le téléchargement d’un document dans la console admin.
 
 Le fichier `render.yaml` ne provisionne plus de base Render PostgreSQL : le code utilise `drizzle-orm/mysql2` et doit utiliser TiDB/MySQL, pas PostgreSQL.
 
@@ -81,9 +81,9 @@ Le fichier `render.yaml` ne provisionne plus de base Render PostgreSQL : le code
 - Microsoft OAuth Authorization Code + PKCE : https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow
 - Microsoft Graph list messages, permissions déléguées et application : https://learn.microsoft.com/en-us/graph/api/user-list-messages?view=graph-rest-1.0
 - Microsoft Graph accès application/consentement administrateur : https://learn.microsoft.com/en-us/graph/auth-v2-service
-- Resend Send Email API : https://resend.com/docs/api-reference/emails/send-email
-- Resend domaines expéditeurs vérifiés : https://resend.com/docs/dashboard/domains/introduction
-- Resend réception entrante et webhooks : https://resend.com/docs/dashboard/receiving/introduction
+- Brevo Send Email API : https://brevo.com/docs/api-reference/emails/send-email
+- Brevo domaines expéditeurs vérifiés : https://brevo.com/docs/dashboard/domains/introduction
+- Brevo réception entrante et webhooks : https://brevo.com/docs/dashboard/receiving/introduction
 - Render variables d’environnement : https://render.com/docs/configure-environment-variables
 - TiDB Cloud Starter/Essential — TLS obligatoire pour l’endpoint public : https://docs.pingcap.com/tidbcloud/connect-to-tidb-cluster-serverless/
 - PingCAP Node.js `mysql2` — pool MySQL et configuration TLS : https://docs.pingcap.com/developer/dev-guide-sample-application-nodejs-mysql2/

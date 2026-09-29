@@ -19,7 +19,7 @@ import {
 } from "./db";
 import { storagePut, storageGetSignedUrl } from "./storage";
 import { ENV } from "./_core/env";
-import { escapeHtml, resendConfigured, sendTransactionalEmail } from "./_core/resend";
+import { escapeHtml, brevoConfigured, sendTransactionalEmail } from "./_core/brevo";
 import { assertAuthRateLimit, burnPasswordVerification, createOneTimeToken, hashOneTimeToken, hashPassword, normalizeEmail, verifyPassword } from "./_core/clientAuth";
 import { sdk } from "./_core/sdk";
 import {
@@ -35,9 +35,9 @@ async function sendAndLogEmail(input: { to: string; subject: string; text: strin
     await addEmailLog({
       recipient: input.to,
       subject: input.subject,
-      provider: "resend",
+      provider: "brevo",
       providerMessageId: result.id ?? null,
-      status: result.sent ? "sent" : process.env.RESEND_API_KEY ? "failed" : "skipped",
+      status: result.sent ? "sent" : process.env.BREVO_API_KEY ? "failed" : "skipped",
       error: result.error ?? null,
     });
   } catch (error) {
@@ -379,7 +379,7 @@ export const appRouter = router({
             html: `<p>${escapeHtml(content)}</p><p>Référence : #${input.id}</p>`,
             idempotencyKey: `request-${input.id}-admin-update-${Date.now()}`,
           });
-          messages.push(email.sent ? "E-mail client envoyé" : `E-mail client non envoyé : ${email.error || "Resend non configuré"}`);
+          messages.push(email.sent ? "E-mail client envoyé" : `E-mail client non envoyé : ${email.error || "Brevo non configuré"}`);
         }
       }
       await logAdminAction(ctx.user.id, "request.updated", "serviceRequest", input.id, { changes: messages });
@@ -412,7 +412,7 @@ export const appRouter = router({
       return {
         microsoft: { configured: microsoftAdminConfigured(), connected: outlook.connected, email: outlook.email },
         outlook,
-        resend: { configured: resendConfigured(), from: process.env.RESEND_FROM_EMAIL || null },
+        brevo: { configured: brevoConfigured(), from: process.env.BREVO_FROM_EMAIL || null },
         storage: { configured: Boolean(ENV.forgeApiUrl && ENV.forgeApiKey) },
         database,
       };

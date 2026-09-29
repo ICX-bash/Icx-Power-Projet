@@ -31,13 +31,13 @@ services:
         sync: false
       - key: INTEGRATION_ENCRYPTION_KEY
         sync: false
-      - key: RESEND_API_KEY
+      - key: BREVO_API_KEY
         sync: false
-      - key: RESEND_FROM_NAME
+      - key: BREVO_FROM_NAME
         value: ICX Power Solutions SRL
-      - key: RESEND_FROM_EMAIL
+      - key: BREVO_FROM_EMAIL
         sync: false
-      - key: RESEND_REPLY_TO
+      - key: BREVO_REPLY_TO
         value: icxps.sale@outlook.com
       - key: BUILT_IN_FORGE_API_URL
         sync: false

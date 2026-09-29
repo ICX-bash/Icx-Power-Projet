@@ -290,7 +290,7 @@ export default function AdminConsole() {
       toast.success(
         result.emailSent
           ? "Notification et e-mail envoyés."
-          : "Notification créée; e-mail non envoyé (vérifier Resend). "
+          : "Notification créée; e-mail non envoyé (vérifier Brevo). "
       );
       setNotificationTitle("");
       setNotificationBody("");
@@ -773,11 +773,11 @@ export default function AdminConsole() {
                           }
                         />
                         <StatusRow
-                          label="E-mails transactionnels Resend"
-                          configured={integrations.data?.resend.configured}
+                          label="E-mails transactionnels Brevo"
+                          configured={integrations.data?.brevo.configured}
                           loading={integrations.isLoading}
                           detail={
-                            integrations.data?.resend.from ||
+                            integrations.data?.brevo.from ||
                             "Clé ou expéditeur manquant"
                           }
                         />
@@ -1011,7 +1011,7 @@ export default function AdminConsole() {
                           rows={3}
                           maxLength={4000}
                           className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-                          placeholder="Message de suivi — il sera ajouté aux notifications et envoyé par e-mail si Resend est configuré."
+                          placeholder="Message de suivi — il sera ajouté aux notifications et envoyé par e-mail si Brevo est configuré."
                         />
                       </label>
                       <label className="flex items-center gap-2 text-xs text-slate-600 sm:col-span-2">
@@ -1479,7 +1479,7 @@ export default function AdminConsole() {
             <section>
               <PageIntro
                 title="Notifications & communications"
-                text="Créer une notification dans l’espace client et, si configuré, envoyer le même message par e-mail via Resend."
+                text="Créer une notification dans l’espace client et, si configuré, envoyer le même message par e-mail via Brevo."
               />
               <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(320px,0.8fr)_minmax(400px,1.2fr)]">
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1532,7 +1532,7 @@ export default function AdminConsole() {
                           setSendNotificationEmail(event.target.checked)
                         }
                       />
-                      Envoyer aussi par e-mail (Resend)
+                      Envoyer aussi par e-mail (Brevo)
                     </label>
                     <button
                       disabled={
@@ -1669,7 +1669,7 @@ export default function AdminConsole() {
             <section>
               <PageIntro
                 title="Journal d’activité"
-                text="Historique des opérations admin et journal technique des envois Resend. Les corps de messages et secrets ne sont jamais affichés ici."
+                text="Historique des opérations admin et journal technique des envois Brevo. Les corps de messages et secrets ne sont jamais affichés ici."
                 action={
                   <button
                     onClick={() => {
@@ -1719,7 +1719,7 @@ export default function AdminConsole() {
                   </div>
                 </section>
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <h3 className="font-extrabold">Journal Resend</h3>
+                  <h3 className="font-extrabold">Journal Brevo</h3>
                   <div className="mt-4 max-h-[70vh] space-y-2 overflow-auto">
                     {emailLogs.isLoading ? (
                       <LoadingCard />
@@ -1798,15 +1798,15 @@ export default function AdminConsole() {
                 />
                 <IntegrationCard
                   icon={Send}
-                  title="Resend — courriels sortants"
+                  title="Brevo — courriels sortants"
                   state={
-                    integrations.data?.resend.configured ? "ready" : "missing"
+                    integrations.data?.brevo.configured ? "ready" : "missing"
                   }
                   detail={
-                    integrations.data?.resend.from ||
-                    "RESEND_API_KEY et RESEND_FROM_EMAIL requis"
+                    integrations.data?.brevo.from ||
+                    "BREVO_API_KEY et BREVO_FROM_EMAIL requis"
                   }
-                  note="Les e-mails ne partent que depuis un domaine expéditeur vérifié chez Resend. Réponses configurées vers RESEND_REPLY_TO."
+                  note="Les e-mails partent depuis un expéditeur vérifié chez Brevo. Réponses configurées vers BREVO_REPLY_TO."
                 />
                 <IntegrationCard
                   icon={FileArchive}
@@ -1849,10 +1849,10 @@ export default function AdminConsole() {
                     "MICROSOFT_CLIENT_SECRET",
                     "MICROSOFT_REDIRECT_URI=https://VOTRE-DOMAINE/api/admin/auth/callback",
                     "INTEGRATION_ENCRYPTION_KEY (32 octets en base64)",
-                    "RESEND_API_KEY",
-                    "RESEND_FROM_EMAIL (domaine vérifié)",
-                    "RESEND_FROM_NAME=ICX Power Solutions",
-                    "RESEND_REPLY_TO=icxps.sale@outlook.com",
+                    "BREVO_API_KEY",
+                    "BREVO_FROM_EMAIL (expéditeur vérifié)",
+                    "BREVO_FROM_NAME=ICX Power Solutions",
+                    "BREVO_REPLY_TO=icxps.sale@outlook.com",
                     "DATABASE_URL",
                     "BUILT_IN_FORGE_API_URL",
                     "BUILT_IN_FORGE_API_KEY",

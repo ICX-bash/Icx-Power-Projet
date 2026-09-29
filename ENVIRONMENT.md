@@ -13,9 +13,9 @@ Configurez les variables dans **Render → Web Service → Environment**. N’en
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Application Microsoft Entra; le secret reste uniquement dans Render. |
 | `MICROSOFT_REDIRECT_URI` | Callback exact `https://VOTRE-SERVICE.onrender.com/api/admin/auth/callback`, également déclaré en plateforme Web dans Entra. |
 | `INTEGRATION_ENCRYPTION_KEY` | Clé base64 aléatoire de 32 octets pour chiffrer le refresh token Outlook. Ne pas la changer sans migrer le jeton. |
-| `RESEND_API_KEY` | Clé API serveur pour les emails de vérification, de réinitialisation et les notifications. |
-| `RESEND_FROM_NAME` / `RESEND_FROM_EMAIL` | Nom et expéditeur; le domaine d’envoi doit être vérifié dans Resend. |
-| `RESEND_REPLY_TO` | Adresse de réponse, souvent `icxps.sale@outlook.com`. |
+| `BREVO_API_KEY` | Clé API serveur pour les emails de vérification, de réinitialisation et les notifications. |
+| `BREVO_FROM_NAME` / `BREVO_FROM_EMAIL` | Nom et expéditeur; le domaine d’envoi doit être vérifié dans Brevo. |
+| `BREVO_REPLY_TO` | Adresse de réponse, souvent `icxps.sale@outlook.com`. |
 | `BUILT_IN_FORGE_API_URL` / `BUILT_IN_FORGE_API_KEY` | Stockage Forge utilisé actuellement pour les pièces jointes du portail. |
 | `OAUTH_SERVER_URL` | Valeur historique Manus côté serveur; elle n’est plus utilisée par la connexion client. `VITE_APP_ID` et `VITE_OAUTH_PORTAL_URL` ne sont plus requis. |
 

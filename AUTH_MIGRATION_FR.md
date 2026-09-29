@@ -14,7 +14,7 @@
 1. **GitHub** : envoyer les fichiers corrigés sur la branche connectée à Render.
 2. **Render** : configurer les variables, déployer le commit, puis lancer la migration.
 3. **TiDB Cloud** : vérifier que l’URL utilise la base applicative ICX, pas le schéma système `sys`.
-4. **Resend** : garder une clé API valide et un expéditeur provenant d’un domaine vérifié; les MX de la boîte Outlook ne doivent pas être remplacés.
+4. **Brevo** : garder une clé API valide et un expéditeur provenant d’un domaine vérifié; les MX de la boîte Outlook ne doivent pas être remplacés.
 5. **Microsoft Entra** : ne rien changer au callback admin si `/admin` fonctionne déjà; Microsoft reste réservé à l’administration.
 
 ## Étapes de déploiement
@@ -49,9 +49,9 @@ Dans **Render → Web Service ICX → Environment**, vérifiez :
 - `DATABASE_URL` : schéma dédié, par exemple `.../icx_power_solutions`, **pas `/sys`**. Si l’URL TiDB pointe encore sur `/sys`, arrêtez-vous et corrigez d’abord la base cible.
 - `DATABASE_SSL=true` : obligatoire pour l’endpoint public TiDB Cloud.
 - `NEXT_PUBLIC_SITE_URL` : origine HTTPS exacte affichée par Render, par exemple `https://votre-service.onrender.com`, sans `/admin`, sans callback et sans barre finale. Elle sert à former les liens e-mail.
-- `RESEND_API_KEY` : clé API côté Render.
-- `RESEND_FROM_EMAIL` : adresse sur un domaine validé dans Resend; une adresse Outlook personnelle n’est pas un domaine expéditeur.
-- `RESEND_FROM_NAME` : `ICX Power Solutions SRL`.
+- `BREVO_API_KEY` : clé API côté Render.
+- `BREVO_FROM_EMAIL` : adresse sur un domaine validé dans Brevo; une adresse Outlook personnelle n’est pas un domaine expéditeur.
+- `BREVO_FROM_NAME` : `ICX Power Solutions SRL`.
 
 `VITE_APP_ID` et `VITE_OAUTH_PORTAL_URL` ne sont plus requis par la connexion client et ne doivent pas bloquer le déploiement. Le callback, le Client ID et le secret Microsoft restent séparés et ne sont utilisés que par `/admin`.
 
@@ -72,7 +72,7 @@ Dans **Render → Web Service ICX → Environment**, vérifiez :
 Avec une adresse de test que vous contrôlez :
 
 1. Ouvrir `/inscription`, créer le compte et accepter les trois conditions.
-2. Vérifier l’arrivée du message Resend; cliquer sur **Confirmer mon adresse**.
+2. Vérifier l’arrivée du message Brevo; cliquer sur **Confirmer mon adresse**.
 3. Se connecter sur `/connexion`; vérifier l’ouverture de `/mon-espace` et la session après rechargement.
 4. Soumettre une demande test; contrôler qu’elle apparaît dans `/admin`.
 5. Utiliser **Mot de passe oublié**, puis un lien de réinitialisation; confirmer que l’ancien mot de passe ne fonctionne plus.
@@ -81,7 +81,7 @@ Avec une adresse de test que vous contrôlez :
 
 ## En cas d’échec
 
-- **Aucun e-mail reçu** : dans Resend, vérifiez le domaine expéditeur, `RESEND_FROM_EMAIL`, la clé API et le journal des e-mails de la console admin. Vérifiez aussi le dossier indésirable.
+- **Aucun e-mail reçu** : dans Brevo, vérifiez le domaine expéditeur, `BREVO_FROM_EMAIL`, la clé API et le journal des e-mails de la console admin. Vérifiez aussi le dossier indésirable.
 - **Erreur de table inconnue** : `pnpm db:push` n’a pas été exécuté sur la base réellement utilisée par Render, ou `DATABASE_URL` pointe sur une autre base.
 - **Lien renvoyant vers un ancien domaine** : corrigez `NEXT_PUBLIC_SITE_URL` dans Render, puis redéployez.
 - **404 `/app-auth`** : le nouveau bundle ne doit plus appeler cette route. Vérifiez que Render déploie bien le nouveau commit et videz le cache navigateur.

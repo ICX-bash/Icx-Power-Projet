@@ -249,6 +249,9 @@ export default function AdminConsole() {
     { enabled: isAdmin && tab === "outlook" && Boolean(selectedMailId), retry: false }
   );
   const utils = trpc.useUtils();
+  const deleteDocument = trpc.admin.deleteDocument.useMutation({onSuccess:async()=>{await Promise.all([utils.admin.files.invalidate(),utils.admin.requests.invalidate(),utils.admin.dashboard.invalidate()]);toast.success("Document supprimé.")},onError:e=>toast.error(e.message)});
+  const deleteEmailLog = trpc.admin.deleteEmailLog.useMutation({onSuccess:async()=>{await utils.admin.emailLogs.invalidate();toast.success("Journal e-mail supprimé.")},onError:e=>toast.error(e.message)});
+  const deleteUser = trpc.admin.deleteUser.useMutation({onSuccess:async()=>{await Promise.all([utils.admin.users.invalidate(),utils.admin.recipients.invalidate(),utils.admin.dashboard.invalidate()]);toast.success("Compte utilisateur supprimé.")},onError:e=>toast.error(e.message)});
   const setRole = trpc.admin.setRole.useMutation({
     onSuccess: async () => {
       setTeamEmail("");
@@ -1181,6 +1184,7 @@ export default function AdminConsole() {
                           <ArrowDownToLine className="size-3.5" />
                           Télécharger
                         </button>
+                        {isSuper.data && <button onClick={()=>{if(window.confirm(`Supprimer définitivement ${doc.fileName} ?`)) deleteDocument.mutate({id:doc.id})}} className="inline-flex h-8 items-center justify-center rounded-lg border border-rose-200 px-2 text-[11px] font-bold text-rose-700 hover:bg-rose-50">Supprimer</button>}
                       </div>
                     ))
                   )}
@@ -1659,6 +1663,7 @@ export default function AdminConsole() {
                   </p>
                   <UsersTable
                     setRole={(email, role) => setRole.mutate({ email, role })}
+                    onDelete={(id,email)=>{if(window.confirm(`Supprimer définitivement le compte ${email||id} et ses données ?`)) deleteUser.mutate({id})}}
                   />
                 </div>
               )}
@@ -1750,6 +1755,7 @@ export default function AdminConsole() {
                           <p className="mt-1 truncate text-[10px] text-slate-500">
                             {log.recipient} · {dateLabel(log.createdAt)}
                           </p>
+                          {isSuper.data && <button onClick={()=>{if(window.confirm("Supprimer ce journal e-mail ?")) deleteEmailLog.mutate({id:log.id})}} className="mt-2 text-[10px] font-bold text-rose-700">Supprimer le journal</button>}
                           {log.error && (
                             <p className="mt-2 text-[10px] text-rose-600">
                               {log.error}
@@ -2003,8 +2009,10 @@ function IntegrationCard({
 }
 function UsersTable({
   setRole,
+  onDelete,
 }: {
   setRole: (email: string, role: "user" | "admin") => void;
+  onDelete: (id: number, email: string | null) => void;
 }) {
   const users = trpc.admin.users.useQuery(undefined, { retry: false });
   return (
@@ -2044,14 +2052,10 @@ function UsersTable({
             {user.isProtectedPrincipal || !user.email ? (
               <span className="text-[10px] text-slate-400">Protégé</span>
             ) : (
-              <button
-                onClick={() =>
-                  setRole(user.email!, user.role === "admin" ? "user" : "admin")
-                }
-                className="h-8 rounded-lg border border-slate-200 text-[10px] font-bold hover:bg-slate-50"
-              >
-                {user.role === "admin" ? "Révoquer" : "Promouvoir"}
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setRole(user.email!, user.role === "admin" ? "user" : "admin")} className="h-8 rounded-lg border border-slate-200 px-2 text-[10px] font-bold hover:bg-slate-50">{user.role === "admin" ? "Révoquer" : "Promouvoir"}</button>
+                <button onClick={() => onDelete(user.id, user.email)} className="h-8 rounded-lg border border-rose-200 px-2 text-[10px] font-bold text-rose-700 hover:bg-rose-50">Supprimer</button>
+              </div>
             )}
           </div>
         ))

@@ -15,7 +15,7 @@ import {
   recordClientLoginFailure, resetClientPassword, saveClientPasswordResetToken,
   updateClientVerificationToken, updateUserLastSignedIn, verifyClientEmailToken,
   getWorkflowProgressForUser, listUsers, saveWorkflowProgress, setUserRoleByEmail,
-  updateServiceRequestAdmin, updateServiceRequestStatus,
+  updateServiceRequestAdmin, updateServiceRequestStatus, deleteServiceDocument, deleteEmailLog, deleteUserAccount,
 } from "./db";
 import { storagePut, storageGetSignedUrl } from "./storage";
 import { ENV } from "./_core/env";
@@ -322,6 +322,7 @@ export const appRouter = router({
 
   notifications: router({
     mine: protectedProcedure.query(({ ctx }) => getUserNotifications(ctx.user.id)),
+    sendToAdmin: protectedProcedure.input(z.object({title:z.string().min(2).max(180),content:z.string().min(2).max(4000),sendEmail:z.boolean().default(true)})).mutation(async ({ctx,input})=>{await createUserNotification({userId:ctx.user.id,title:`Message utilisateur · ${input.title}`,content:input.content});const email=await sendAndLogEmail({to:ENV.superAdminEmail,subject:`[Portail utilisateur] ${input.title}`,text:`${ctx.user.name||ctx.user.email||"Utilisateur"} (${ctx.user.email||""})\n\n${input.content}`,html:`<p><strong>${escapeHtml(ctx.user.name||ctx.user.email||"Utilisateur")}</strong> (${escapeHtml(ctx.user.email||"")})</p><p>${escapeHtml(input.content).replace(/\n/g,"<br>")}</p>`,idempotencyKey:`user-message-${ctx.user.id}-${Date.now()}`});return {success:true,emailSent:email.sent} as const;}),
   }),
 
   admin: router({
@@ -339,6 +340,7 @@ export const appRouter = router({
       const requests = await getAllServiceRequestsWithDocuments();
       return requests.flatMap(request => request.documents.map(({ fileKey: _fileKey, fileUrl: _fileUrl, ...document }) => ({ ...document, request: { id: request.id, serviceKey: request.serviceKey, status: request.status, firstName: request.firstName, lastName: request.lastName, email: request.email } })));
     }),
+    deleteDocument: superAdminProcedure.input(z.object({id:z.number().int().positive()})).mutation(async ({ctx,input})=>{const doc=await getServiceDocumentById(input.id);if(!doc)throw new TRPCError({code:"NOT_FOUND",message:"Document introuvable."});await deleteServiceDocument(input.id);await logAdminAction(ctx.user.id,"document.deleted","serviceDocument",input.id,{fileName:doc.fileName});return {success:true} as const;}),
     documentUrl: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
       const document = await getServiceDocumentById(input.id);
       if (!document) throw new TRPCError({ code: "NOT_FOUND", message: "Document introuvable." });
@@ -407,6 +409,8 @@ export const appRouter = router({
     }),
     audit: adminProcedure.input(z.object({ entity: z.string().max(80).optional(), entityId: z.number().int().positive().optional(), limit: z.number().int().min(1).max(500).optional() }).optional()).query(({ input }) => getAuditLogs(input ?? {})),
     emailLogs: adminProcedure.query(() => getEmailLogs(150)),
+    deleteEmailLog: superAdminProcedure.input(z.object({id:z.number().int().positive()})).mutation(async ({ctx,input})=>{await deleteEmailLog(input.id);await logAdminAction(ctx.user.id,"email.log.deleted","emailLog",input.id);return {success:true} as const;}),
+    deleteUser: superAdminProcedure.input(z.object({id:z.number().int().positive()})).mutation(async ({ctx,input})=>{const target=await getUserById(input.id);if(!target)throw new TRPCError({code:"NOT_FOUND",message:"Compte introuvable."});if(isSuperAdminIdentity(target))throw new TRPCError({code:"FORBIDDEN",message:"Le compte super-admin ne peut pas être supprimé."});await deleteUserAccount(input.id);await logAdminAction(ctx.user.id,"user.deleted","user",input.id,{email:target.email});return {success:true} as const;}),
     integrations: adminProcedure.query(async () => {
       const [outlook, database] = await Promise.all([outlookIntegrationStatus(), checkDatabaseConnection()]);
       return {

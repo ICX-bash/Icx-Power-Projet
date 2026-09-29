@@ -148,6 +148,21 @@ export async function createClientAuthAccount(input: {
     const existingAuth = await tx.select().from(clientAuthAccounts).where(eq(clientAuthAccounts.email, input.email)).limit(1);
     if (existingAuth[0]) {
       const existingUser = await tx.select().from(users).where(eq(users.id, existingAuth[0].userId)).limit(1);
+      // Une inscription précédente peut avoir créé le compte avant l’envoi de
+      // l’e-mail. Tant que l’adresse n’est pas confirmée, une nouvelle
+      // inscription doit remplacer le mot de passe saisi par l’utilisateur.
+      // Un compte déjà confirmé ne peut jamais être écrasé par register : il
+      // doit passer par « Mot de passe oublié ».
+      if (!existingAuth[0].emailVerifiedAt) {
+        await tx.update(clientAuthAccounts).set({
+          passwordHash: input.passwordHash,
+          passwordChangedAt: input.verificationSentAt,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        }).where(eq(clientAuthAccounts.userId, existingAuth[0].userId));
+        const refreshedAuth = await tx.select().from(clientAuthAccounts).where(eq(clientAuthAccounts.userId, existingAuth[0].userId)).limit(1);
+        return { created: false, account: refreshedAuth[0], user: existingUser[0] };
+      }
       return { created: false, account: existingAuth[0], user: existingUser[0] };
     }
 

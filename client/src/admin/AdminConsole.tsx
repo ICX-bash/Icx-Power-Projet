@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { CountryField } from "@/components/WorldCountryFields";
 
 type Tab =
   | "overview"
@@ -170,6 +171,8 @@ export default function AdminConsole() {
   const [priorityFilter, setPriorityFilter] = useState("Toutes les priorités");
   const [serviceFilter, setServiceFilter] = useState("Tous les services");
   const [countryFilter, setCountryFilter] = useState("Tous les pays");
+  const [senderFilter, setSenderFilter] = useState("all");
+  const [mailSenderFilter, setMailSenderFilter] = useState("all");
   const [needFilter, setNeedFilter] = useState("");
   const [sortBy, setSortBy] = useState("recent");
   const [priorityDraft, setPriorityDraft] = useState("normal");
@@ -247,16 +250,48 @@ export default function AdminConsole() {
   );
   const outlookMessage = trpc.admin.outlookMessage.useQuery(
     { messageId: selectedMailId },
-    { enabled: isAdmin && tab === "outlook" && Boolean(selectedMailId), retry: false }
+    {
+      enabled: isAdmin && tab === "outlook" && Boolean(selectedMailId),
+      retry: false,
+    }
   );
   const outlookAttachments = trpc.admin.outlookAttachments.useQuery(
     { messageId: selectedMailId },
-    { enabled: isAdmin && tab === "outlook" && Boolean(selectedMailId), retry: false }
+    {
+      enabled: isAdmin && tab === "outlook" && Boolean(selectedMailId),
+      retry: false,
+    }
   );
   const utils = trpc.useUtils();
-  const deleteDocument = trpc.admin.deleteDocument.useMutation({onSuccess:async()=>{await Promise.all([utils.admin.files.invalidate(),utils.admin.requests.invalidate(),utils.admin.dashboard.invalidate()]);toast.success("Document supprimé.")},onError:e=>toast.error(e.message)});
-  const deleteEmailLog = trpc.admin.deleteEmailLog.useMutation({onSuccess:async()=>{await utils.admin.emailLogs.invalidate();toast.success("Journal e-mail supprimé.")},onError:e=>toast.error(e.message)});
-  const deleteUser = trpc.admin.deleteUser.useMutation({onSuccess:async()=>{await Promise.all([utils.admin.users.invalidate(),utils.admin.recipients.invalidate(),utils.admin.dashboard.invalidate()]);toast.success("Compte utilisateur supprimé.")},onError:e=>toast.error(e.message)});
+  const deleteDocument = trpc.admin.deleteDocument.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.admin.files.invalidate(),
+        utils.admin.requests.invalidate(),
+        utils.admin.dashboard.invalidate(),
+      ]);
+      toast.success("Document supprimé.");
+    },
+    onError: e => toast.error(e.message),
+  });
+  const deleteEmailLog = trpc.admin.deleteEmailLog.useMutation({
+    onSuccess: async () => {
+      await utils.admin.emailLogs.invalidate();
+      toast.success("Journal e-mail supprimé.");
+    },
+    onError: e => toast.error(e.message),
+  });
+  const deleteUser = trpc.admin.deleteUser.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.admin.users.invalidate(),
+        utils.admin.recipients.invalidate(),
+        utils.admin.dashboard.invalidate(),
+      ]);
+      toast.success("Compte utilisateur supprimé.");
+    },
+    onError: e => toast.error(e.message),
+  });
   const setRole = trpc.admin.setRole.useMutation({
     onSuccess: async () => {
       setTeamEmail("");
@@ -289,7 +324,13 @@ export default function AdminConsole() {
     onError: error =>
       toast.error(error.message || "Téléchargement impossible."),
   });
-  const deleteNotification = trpc.admin.deleteNotification.useMutation({ onSuccess: async () => { await utils.admin.notifications.invalidate(); toast.success("Notification supprimée."); }, onError: error => toast.error(error.message) });
+  const deleteNotification = trpc.admin.deleteNotification.useMutation({
+    onSuccess: async () => {
+      await utils.admin.notifications.invalidate();
+      toast.success("Notification supprimée.");
+    },
+    onError: error => toast.error(error.message),
+  });
   const sendNotification = trpc.admin.sendNotification.useMutation({
     onSuccess: async result => {
       await Promise.all([
@@ -343,6 +384,63 @@ export default function AdminConsole() {
   });
 
   const requestRows = requests.data ?? [];
+  const clientLabel = (userId: number) => {
+    const client = recipients.data?.find(user => user.id === userId);
+    return client?.name || client?.email || `Compte #${userId}`;
+  };
+  const visibleFiles = [...(files.data ?? [])]
+    .filter(
+      file => senderFilter === "all" || String(file.userId) === senderFilter
+    )
+    .sort(
+      (a, b) =>
+        a.userId - b.userId ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  const visibleNotices = [...(notices.data ?? [])]
+    .filter(
+      item => senderFilter === "all" || String(item.userId) === senderFilter
+    )
+    .sort(
+      (a, b) =>
+        a.userId - b.userId ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  const visibleEmailLogs = [...(emailLogs.data ?? [])]
+    .filter(
+      log =>
+        senderFilter === "all" ||
+        recipients.data
+          ?.find(user => String(user.id) === senderFilter)
+          ?.email?.toLowerCase() === log.recipient.toLowerCase()
+    )
+    .sort(
+      (a, b) =>
+        a.recipient.localeCompare(b.recipient) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  const mailboxRows = (messages.data ?? []) as Array<{
+    from?: { emailAddress?: { name?: string; address?: string } };
+  }>;
+  const mailboxSenders = Array.from(
+    new Set(
+      mailboxRows
+        .map(item => item.from?.emailAddress?.address)
+        .filter((email): email is string => Boolean(email))
+    )
+  ).sort();
+  const visibleMailboxMessages = mailboxRows
+    .filter(
+      item =>
+        mailSenderFilter === "all" ||
+        item.from?.emailAddress?.address === mailSenderFilter
+    )
+    .sort((a, b) =>
+      (a.from?.emailAddress?.address || "").localeCompare(
+        b.from?.emailAddress?.address || ""
+      )
+    );
+
   const selectedRequest =
     requestRows.find(item => item.id === selectedRequestId) ?? null;
   useEffect(() => {
@@ -368,17 +466,55 @@ export default function AdminConsole() {
           `${item.id} ${item.firstName} ${item.lastName} ${item.email} ${item.serviceKey}`
             .toLowerCase()
             .includes(search);
-        const matchesStatus = statusFilter === "Tous les statuts" || item.status === statusFilter;
-        const matchesPriority = priorityFilter === "Toutes les priorités" || item.priority === priorityFilter;
-        const matchesService = serviceFilter === "Tous les services" || item.serviceKey === serviceFilter;
-        const matchesCountry = countryFilter === "Tous les pays" || item.country === countryFilter;
-        const matchesNeed = !needFilter.trim() || `${item.message || ""} ${item.serviceKey}`.toLowerCase().includes(needFilter.trim().toLowerCase());
-        return matchesSearch && matchesStatus && matchesPriority && matchesService && matchesCountry && matchesNeed;
+        const matchesStatus =
+          statusFilter === "Tous les statuts" || item.status === statusFilter;
+        const matchesPriority =
+          priorityFilter === "Toutes les priorités" ||
+          item.priority === priorityFilter;
+        const matchesService =
+          serviceFilter === "Tous les services" ||
+          item.serviceKey === serviceFilter;
+        const matchesCountry =
+          countryFilter === "Tous les pays" || item.country === countryFilter;
+        const matchesSender =
+          senderFilter === "all" || String(item.userId) === senderFilter;
+        const matchesNeed =
+          !needFilter.trim() ||
+          `${item.message || ""} ${item.serviceKey}`
+            .toLowerCase()
+            .includes(needFilter.trim().toLowerCase());
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesPriority &&
+          matchesService &&
+          matchesCountry &&
+          matchesSender &&
+          matchesNeed
+        );
       }),
-    [requestRows, requestSearch, statusFilter, priorityFilter, serviceFilter, countryFilter, needFilter]
+    [
+      requestRows,
+      requestSearch,
+      statusFilter,
+      priorityFilter,
+      serviceFilter,
+      countryFilter,
+      senderFilter,
+      needFilter,
+    ]
   );
   const priorityOrder = { urgent: 4, high: 3, normal: 2, low: 1 } as const;
-  const sortedVisibleRequests = [...visibleRequests].sort((a, b) => sortBy === "oldest" ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() : sortBy === "priority" ? (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - (priorityOrder[a.priority as keyof typeof priorityOrder] || 0) : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const sortedVisibleRequests = [...visibleRequests].sort(
+    (a, b) =>
+      a.userId - b.userId ||
+      (sortBy === "oldest"
+        ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        : sortBy === "priority"
+          ? (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) -
+            (priorityOrder[a.priority as keyof typeof priorityOrder] || 0)
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  );
   const selectedMail = (messages.data ?? []).find(
     raw => (raw as { id?: string }).id === selectedMailId
   ) as
@@ -802,10 +938,16 @@ export default function AdminConsole() {
                           detail="Stockage Forge pour les fichiers clients"
                         />
                         <StatusRow
-                  label="Base TiDB/MySQL"
-                  configured={integrations.data?.database.connected}
-                  loading={integrations.isLoading}
-                  detail={integrations.data?.database.connected ? "Connexion SQL/TLS opérationnelle" : integrations.data?.database.configured ? "URL présente; vérifier réseau, TLS et migrations" : "DATABASE_URL absent"}
+                          label="Base TiDB/MySQL"
+                          configured={integrations.data?.database.connected}
+                          loading={integrations.isLoading}
+                          detail={
+                            integrations.data?.database.connected
+                              ? "Connexion SQL/TLS opérationnelle"
+                              : integrations.data?.database.configured
+                                ? "URL présente; vérifier réseau, TLS et migrations"
+                                : "DATABASE_URL absent"
+                          }
                         />
                       </div>
                     </section>
@@ -853,12 +995,83 @@ export default function AdminConsole() {
                       ))}
                     </select>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      <select value={priorityFilter} onChange={event => setPriorityFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option>Toutes les priorités</option>{PRIORITIES.map(priority => <option key={priority} value={priority}>{priority === "urgent" ? "Urgente" : priority === "high" ? "Haute" : priority === "low" ? "Basse" : "Normale"}</option>)}</select>
-                      <select value={serviceFilter} onChange={event => setServiceFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option>Tous les services</option>{Array.from(new Set(requestRows.map(item => item.serviceKey))).sort().map(service => <option key={service}>{service}</option>)}</select>
-                      <select value={countryFilter} onChange={event => setCountryFilter(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option>Tous les pays</option>{Array.from(new Set(requestRows.map(item => item.country).filter(Boolean))).sort().map(country => <option key={country}>{country}</option>)}</select>
-                      <select value={sortBy} onChange={event => setSortBy(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"><option value="recent">Plus récentes</option><option value="priority">Priorité / urgence</option><option value="oldest">Plus anciennes</option></select>
+                      <select
+                        value={priorityFilter}
+                        onChange={event =>
+                          setPriorityFilter(event.target.value)
+                        }
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"
+                      >
+                        <option>Toutes les priorités</option>
+                        {PRIORITIES.map(priority => (
+                          <option key={priority} value={priority}>
+                            {priority === "urgent"
+                              ? "Urgente"
+                              : priority === "high"
+                                ? "Haute"
+                                : priority === "low"
+                                  ? "Basse"
+                                  : "Normale"}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={serviceFilter}
+                        onChange={event => setServiceFilter(event.target.value)}
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"
+                      >
+                        <option>Tous les services</option>
+                        {Array.from(
+                          new Set(requestRows.map(item => item.serviceKey))
+                        )
+                          .sort()
+                          .map(service => (
+                            <option key={service}>{service}</option>
+                          ))}
+                      </select>
+                      <CountryField
+                        value={
+                          countryFilter === "Tous les pays" ? "" : countryFilter
+                        }
+                        onChange={value =>
+                          setCountryFilter(value || "Tous les pays")
+                        }
+                        locale="fr"
+                        placeholder="Tous les pays ou saisir…"
+                        className="sm:col-span-2"
+                      />
+                      <select
+                        aria-label="Filtrer par utilisateur expéditeur"
+                        value={senderFilter}
+                        onChange={event => setSenderFilter(event.target.value)}
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold sm:col-span-2"
+                      >
+                        <option value="all">
+                          Tous les utilisateurs / expéditeurs
+                        </option>
+                        {recipients.data?.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.name || user.email || `Compte #${user.id}`}{" "}
+                            {user.email ? `— ${user.email}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={sortBy}
+                        onChange={event => setSortBy(event.target.value)}
+                        className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"
+                      >
+                        <option value="recent">Plus récentes</option>
+                        <option value="priority">Priorité / urgence</option>
+                        <option value="oldest">Plus anciennes</option>
+                      </select>
                     </div>
-                    <input value={needFilter} onChange={event => setNeedFilter(event.target.value)} placeholder="Besoin ou programme d’études…" className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs" />
+                    <input
+                      value={needFilter}
+                      onChange={event => setNeedFilter(event.target.value)}
+                      placeholder="Besoin ou programme d’études…"
+                      className="mt-2 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs"
+                    />
                   </div>
                   <div className="max-h-[70vh] overflow-auto">
                     {requests.isLoading ? (
@@ -866,53 +1079,64 @@ export default function AdminConsole() {
                     ) : requests.error ? (
                       <ErrorCard message="Impossible de charger les demandes. Vérifiez les migrations TiDB." />
                     ) : (
-                      sortedVisibleRequests.map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => setSelectedRequestId(item.id)}
-                          className={`w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 ${selectedRequestId === item.id ? "bg-emerald-50/70 ring-1 ring-inset ring-emerald-200" : ""}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-extrabold text-slate-500">
-                              DOSSIER #{item.id}
-                            </span>
-                            <Badge
-                              tone={
-                                item.status === "Reçu"
-                                  ? "blue"
-                                  : item.status === "Refusé"
-                                    ? "red"
-                                    : item.status === "Accepté"
-                                      ? "green"
-                                      : "amber"
-                              }
-                            >
-                              {item.status}
-                            </Badge>
-                          </div>
-                          <p className="mt-2 font-bold">
-                            {item.firstName} {item.lastName}
-                          </p>
-                          <p className="mt-1 truncate text-xs text-slate-500">
-                            {item.serviceKey} · {item.email}
-                          </p>
-                          <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
-                            <span>
-                              {item.documents?.length ??
-                                item.attachmentCount ??
-                                0}{" "}
-                              fichier(s)
-                            </span>
-                            <span>{dateLabel(item.updatedAt)}</span>
-                          </div>
-                        </button>
+                      sortedVisibleRequests.map((item, index) => (
+                        <div key={`request-user-${item.id}`}>
+                          {(index === 0 ||
+                            sortedVisibleRequests[index - 1].userId !==
+                              item.userId) && (
+                            <p className="sticky top-0 z-[1] border-b border-slate-200 bg-slate-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                              Dossiers transmis par {clientLabel(item.userId)} ·{" "}
+                              {item.email}
+                            </p>
+                          )}
+                          <button
+                            key={item.id}
+                            onClick={() => setSelectedRequestId(item.id)}
+                            className={`w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 ${selectedRequestId === item.id ? "bg-emerald-50/70 ring-1 ring-inset ring-emerald-200" : ""}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] font-extrabold text-slate-500">
+                                DOSSIER #{item.id}
+                              </span>
+                              <Badge
+                                tone={
+                                  item.status === "Reçu"
+                                    ? "blue"
+                                    : item.status === "Refusé"
+                                      ? "red"
+                                      : item.status === "Accepté"
+                                        ? "green"
+                                        : "amber"
+                                }
+                              >
+                                {item.status}
+                              </Badge>
+                            </div>
+                            <p className="mt-2 font-bold">
+                              {item.firstName} {item.lastName}
+                            </p>
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                              {item.serviceKey} · {item.email}
+                            </p>
+                            <div className="mt-3 flex items-center justify-between text-[10px] text-slate-400">
+                              <span>
+                                {item.documents?.length ??
+                                  item.attachmentCount ??
+                                  0}{" "}
+                                fichier(s)
+                              </span>
+                              <span>{dateLabel(item.updatedAt)}</span>
+                            </div>
+                          </button>
+                        </div>
                       ))
                     )}
-                    {!requests.isLoading && sortedVisibleRequests.length === 0 && (
-                      <p className="p-8 text-center text-sm text-slate-400">
-                        Aucun résultat.
-                      </p>
-                    )}
+                    {!requests.isLoading &&
+                      sortedVisibleRequests.length === 0 && (
+                        <p className="p-8 text-center text-sm text-slate-400">
+                          Aucun résultat.
+                        </p>
+                      )}
                   </div>
                 </section>
                 {!selectedRequest ? (
@@ -1140,6 +1364,22 @@ export default function AdminConsole() {
                   </button>
                 }
               />
+              <label className="mt-4 block max-w-xl text-[11px] font-bold text-slate-600">
+                Filtrer les pièces par utilisateur qui les a transmises
+                <select
+                  value={senderFilter}
+                  onChange={event => setSenderFilter(event.target.value)}
+                  className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                >
+                  <option value="all">Tous les utilisateurs</option>
+                  {recipients.data?.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email || `Compte #${user.id}`}{" "}
+                      {user.email ? `— ${user.email}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {files.error && (
                 <div className="mt-4">
                   <ErrorCard message="Les pièces ne peuvent pas être listées. Vérifiez la base et le fournisseur de stockage." />
@@ -1163,46 +1403,66 @@ export default function AdminConsole() {
                   {files.isLoading ? (
                     <LoadingCard />
                   ) : (
-                    files.data?.map(doc => (
-                      <div
-                        key={doc.id}
-                        className="grid grid-cols-[minmax(0,1.5fr)_minmax(120px,1fr)_100px_120px] items-center gap-3 border-b border-slate-100 px-4 py-3"
-                      >
-                        <div className="flex min-w-0 items-center gap-3">
-                          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
-                            <FileText className="size-4" />
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-bold">
-                              {doc.fileName}
-                            </p>
-                            <p className="mt-1 text-[10px] text-slate-400">
-                              #{doc.request.id} · {doc.request.serviceKey} ·{" "}
-                              {dateLabel(doc.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold">
-                            {doc.request.firstName} {doc.request.lastName}
-                          </p>
-                          <p className="truncate text-[10px] text-slate-400">
+                    visibleFiles.map((doc, index) => (
+                      <div key={`file-group-${doc.id}`}>
+                        {(index === 0 ||
+                          visibleFiles[index - 1].userId !== doc.userId) && (
+                          <p className="border-y border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                            Pièces de {clientLabel(doc.userId)} ·{" "}
                             {doc.request.email}
                           </p>
+                        )}
+                        <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(120px,1fr)_100px_120px] items-center gap-3 border-b border-slate-100 px-4 py-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-800">
+                              <FileText className="size-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-bold">
+                                {doc.fileName}
+                              </p>
+                              <p className="mt-1 text-[10px] text-slate-400">
+                                #{doc.request.id} · {doc.request.serviceKey} ·{" "}
+                                {dateLabel(doc.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold">
+                              {doc.request.firstName} {doc.request.lastName}
+                            </p>
+                            <p className="truncate text-[10px] text-slate-400">
+                              {doc.request.email}
+                            </p>
+                          </div>
+                          <span className="text-xs text-slate-500">
+                            {fileSize(doc.fileSize)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              downloadDocument.mutate({ id: doc.id })
+                            }
+                            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-[11px] font-bold hover:bg-slate-50"
+                          >
+                            <ArrowDownToLine className="size-3.5" />
+                            Télécharger
+                          </button>
+                          {isSuper.data && (
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Supprimer définitivement ${doc.fileName} ?`
+                                  )
+                                )
+                                  deleteDocument.mutate({ id: doc.id });
+                              }}
+                              className="inline-flex h-8 items-center justify-center rounded-lg border border-rose-200 px-2 text-[11px] font-bold text-rose-700 hover:bg-rose-50"
+                            >
+                              Supprimer
+                            </button>
+                          )}
                         </div>
-                        <span className="text-xs text-slate-500">
-                          {fileSize(doc.fileSize)}
-                        </span>
-                        <button
-                          onClick={() =>
-                            downloadDocument.mutate({ id: doc.id })
-                          }
-                          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-[11px] font-bold hover:bg-slate-50"
-                        >
-                          <ArrowDownToLine className="size-3.5" />
-                          Télécharger
-                        </button>
-                        {isSuper.data && <button onClick={()=>{if(window.confirm(`Supprimer définitivement ${doc.fileName} ?`)) deleteDocument.mutate({id:doc.id})}} className="inline-flex h-8 items-center justify-center rounded-lg border border-rose-200 px-2 text-[11px] font-bold text-rose-700 hover:bg-rose-50">Supprimer</button>}
                       </div>
                     ))
                   )}
@@ -1291,6 +1551,23 @@ export default function AdminConsole() {
                   </div>
                   <div className="grid min-h-[520px] lg:grid-cols-[minmax(300px,0.82fr)_minmax(360px,1.18fr)]">
                     <div className="max-h-[68vh] overflow-auto border-r border-slate-100">
+                      <label className="sticky top-0 z-[2] block border-b border-slate-100 bg-white p-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        Regrouper / filtrer par expéditeur
+                        <select
+                          value={mailSenderFilter}
+                          onChange={event =>
+                            setMailSenderFilter(event.target.value)
+                          }
+                          className="mt-1.5 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs normal-case tracking-normal"
+                        >
+                          <option value="all">Tous les expéditeurs</option>
+                          {mailboxSenders.map(sender => (
+                            <option key={sender} value={sender}>
+                              {sender}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                       {messages.isLoading ? (
                         <LoadingCard />
                       ) : messages.error ? (
@@ -1301,7 +1578,7 @@ export default function AdminConsole() {
                           }
                         />
                       ) : (
-                        (messages.data ?? []).map(raw => {
+                        visibleMailboxMessages.map(raw => {
                           const email = raw as {
                             id: string;
                             subject?: string;
@@ -1422,22 +1699,44 @@ export default function AdminConsole() {
                           </div>
                           {selectedMail.hasAttachments && (
                             <div className="mt-4 rounded-xl border border-slate-200 p-4">
-                              <p className="text-xs font-extrabold">Pièces jointes Outlook</p>
+                              <p className="text-xs font-extrabold">
+                                Pièces jointes Outlook
+                              </p>
                               {outlookAttachments.isLoading ? (
-                                <p className="mt-2 text-xs text-slate-400">Lecture des fichiers…</p>
+                                <p className="mt-2 text-xs text-slate-400">
+                                  Lecture des fichiers…
+                                </p>
                               ) : outlookAttachments.error ? (
-                                <p className="mt-2 text-xs text-rose-600">Impossible de lister les pièces jointes.</p>
+                                <p className="mt-2 text-xs text-rose-600">
+                                  Impossible de lister les pièces jointes.
+                                </p>
                               ) : (
                                 <div className="mt-2 space-y-2">
                                   {(outlookAttachments.data ?? []).map(raw => {
-                                    const attachment = raw as { id: string; name?: string; size?: number; contentType?: string; isInline?: boolean };
+                                    const attachment = raw as {
+                                      id: string;
+                                      name?: string;
+                                      size?: number;
+                                      contentType?: string;
+                                      isInline?: boolean;
+                                    };
                                     if (attachment.isInline) return null;
                                     const href = `/api/admin/outlook/attachments/${encodeURIComponent(selectedMail.id)}/${encodeURIComponent(attachment.id)}`;
                                     return (
-                                      <a key={attachment.id} href={href} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-xs hover:bg-emerald-50">
+                                      <a
+                                        key={attachment.id}
+                                        href={href}
+                                        className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2.5 text-xs hover:bg-emerald-50"
+                                      >
                                         <FileText className="size-4 shrink-0 text-emerald-800" />
-                                        <span className="min-w-0 flex-1 truncate font-bold">{attachment.name || "Fichier"}</span>
-                                        <span className="shrink-0 text-[10px] text-slate-400">{attachment.size ? fileSize(attachment.size) : attachment.contentType}</span>
+                                        <span className="min-w-0 flex-1 truncate font-bold">
+                                          {attachment.name || "Fichier"}
+                                        </span>
+                                        <span className="shrink-0 text-[10px] text-slate-400">
+                                          {attachment.size
+                                            ? fileSize(attachment.size)
+                                            : attachment.contentType}
+                                        </span>
                                         <ArrowDownToLine className="size-4 shrink-0 text-slate-500" />
                                       </a>
                                     );
@@ -1447,13 +1746,36 @@ export default function AdminConsole() {
                             </div>
                           )}
                           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                            <label className="text-[10px] font-bold text-slate-500">Déplacer vers
-                              <select defaultValue="" onChange={event => { const destinationId = event.target.value; if (destinationId) moveMail.mutate({ messageId: selectedMail.id, destinationId }); event.currentTarget.value = ""; }} className="ml-2 h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold">
+                            <label className="text-[10px] font-bold text-slate-500">
+                              Déplacer vers
+                              <select
+                                defaultValue=""
+                                onChange={event => {
+                                  const destinationId = event.target.value;
+                                  if (destinationId)
+                                    moveMail.mutate({
+                                      messageId: selectedMail.id,
+                                      destinationId,
+                                    });
+                                  event.currentTarget.value = "";
+                                }}
+                                className="ml-2 h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold"
+                              >
                                 <option value="">Choisir un dossier…</option>
-                                {folders.data?.filter(folder => folder.id !== folderId).map(folder => <option key={folder.id} value={folder.id}>{folder.displayName}</option>)}
+                                {folders.data
+                                  ?.filter(folder => folder.id !== folderId)
+                                  .map(folder => (
+                                    <option key={folder.id} value={folder.id}>
+                                      {folder.displayName}
+                                    </option>
+                                  ))}
                               </select>
                             </label>
-                            {moveMail.isPending && <span className="text-[10px] text-slate-400">Déplacement…</span>}
+                            {moveMail.isPending && (
+                              <span className="text-[10px] text-slate-400">
+                                Déplacement…
+                              </span>
+                            )}
                           </div>
                           <div className="mt-5 border-t border-slate-100 pt-5">
                             <label className="text-xs font-extrabold text-slate-700">
@@ -1599,33 +1921,66 @@ export default function AdminConsole() {
                       <RefreshCw className="size-4" />
                     </button>
                   </div>
+                  <label className="mt-4 block text-[11px] font-bold text-slate-600">
+                    Filtrer l’historique par utilisateur
+                    <select
+                      value={senderFilter}
+                      onChange={event => setSenderFilter(event.target.value)}
+                      className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      <option value="all">Tous les utilisateurs</option>
+                      {recipients.data?.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.name || user.email || `Compte #${user.id}`}{" "}
+                          {user.email ? `— ${user.email}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <div className="mt-4 max-h-[620px] space-y-2 overflow-auto">
                     {notices.isLoading ? (
                       <LoadingCard />
                     ) : notices.error ? (
                       <ErrorCard message="Impossible de consulter les notifications." />
                     ) : (
-                      notices.data?.map(item => (
-                        <article
-                          key={item.id}
-                          className="rounded-xl border border-slate-100 p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-bold">{item.title}</p>
-                              <p className="mt-1 text-[10px] text-slate-500">
-                                {item.userName || item.email} · {item.email}
-                              </p>
+                      visibleNotices.map((item, index) => (
+                        <div key={`notice-group-${item.id}`}>
+                          {(index === 0 ||
+                            visibleNotices[index - 1].userId !==
+                              item.userId) && (
+                            <p className="mb-2 mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                              Messages liés à {item.userName || item.email} ·{" "}
+                              {item.email}
+                            </p>
+                          )}
+                          <article className="rounded-xl border border-slate-100 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-bold">
+                                  {item.title}
+                                </p>
+                                <p className="mt-1 text-[10px] text-slate-500">
+                                  {item.userName || item.email} · {item.email}
+                                </p>
+                              </div>
+                              <span className="text-[9px] text-slate-400">
+                                {dateLabel(item.createdAt)}
+                              </span>
                             </div>
-                            <span className="text-[9px] text-slate-400">
-                              {dateLabel(item.createdAt)}
-                            </span>
-                          </div>
-                          <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-600">
-                            {item.content}
-                          </p>
-                          <button type="button" onClick={() => deleteNotification.mutate({ id: item.id })} className="mt-3 text-xs font-bold text-rose-600 hover:underline">Supprimer la notification</button>
-                        </article>
+                            <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                              {item.content}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteNotification.mutate({ id: item.id })
+                              }
+                              className="mt-3 text-xs font-bold text-rose-600 hover:underline"
+                            >
+                              Supprimer la notification
+                            </button>
+                          </article>
+                        </div>
                       ))
                     )}
                     {!notices.isLoading && notices.data?.length === 0 && (
@@ -1682,7 +2037,14 @@ export default function AdminConsole() {
                   </p>
                   <UsersTable
                     setRole={(email, role) => setRole.mutate({ email, role })}
-                    onDelete={(id,email)=>{if(window.confirm(`Supprimer définitivement le compte ${email||id} et ses données ?`)) deleteUser.mutate({id})}}
+                    onDelete={(id, email) => {
+                      if (
+                        window.confirm(
+                          `Supprimer définitivement le compte ${email || id} et ses données ?`
+                        )
+                      )
+                        deleteUser.mutate({ id });
+                    }}
                   />
                 </div>
               )}
@@ -1744,42 +2106,85 @@ export default function AdminConsole() {
                 </section>
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h3 className="font-extrabold">Journal Brevo</h3>
+                  <label className="mt-3 block text-[11px] font-bold text-slate-600">
+                    Filtrer les e-mails par compte destinataire
+                    <select
+                      value={senderFilter}
+                      onChange={event => setSenderFilter(event.target.value)}
+                      className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      <option value="all">Tous les comptes</option>
+                      {recipients.data?.map(user => (
+                        <option key={user.id} value={user.id}>
+                          {user.name || user.email || `Compte #${user.id}`}{" "}
+                          {user.email ? `— ${user.email}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <div className="mt-4 max-h-[70vh] space-y-2 overflow-auto">
                     {emailLogs.isLoading ? (
                       <LoadingCard />
                     ) : emailLogs.error ? (
                       <ErrorCard message="Impossible de charger le journal e-mail." />
                     ) : (
-                      emailLogs.data?.map(log => (
-                        <div
-                          key={log.id}
-                          className="rounded-xl border border-slate-100 p-3"
-                        >
-                          <div className="flex justify-between gap-2">
-                            <p className="truncate text-xs font-bold">
-                              {log.subject}
-                            </p>
-                            <Badge
-                              tone={
-                                log.status === "sent"
-                                  ? "green"
-                                  : log.status === "failed"
-                                    ? "red"
-                                    : "amber"
-                              }
-                            >
-                              {log.status}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 truncate text-[10px] text-slate-500">
-                            {log.recipient} · {dateLabel(log.createdAt)}
-                          </p>
-                          {isSuper.data && <button onClick={()=>{if(window.confirm("Supprimer ce journal e-mail ?")) deleteEmailLog.mutate({id:log.id})}} className="mt-2 text-[10px] font-bold text-rose-700">Supprimer le journal</button>}
-                          {log.error && (
-                            <p className="mt-2 text-[10px] text-rose-600">
-                              {log.error}
+                      visibleEmailLogs.map((log, index) => (
+                        <div key={`email-group-${log.id}`}>
+                          {(index === 0 ||
+                            visibleEmailLogs[
+                              index - 1
+                            ].recipient.toLowerCase() !==
+                              log.recipient.toLowerCase()) && (
+                            <p className="mb-2 mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-600">
+                              Échanges avec{" "}
+                              {recipients.data?.find(
+                                user =>
+                                  user.email?.toLowerCase() ===
+                                  log.recipient.toLowerCase()
+                              )?.name || log.recipient}
                             </p>
                           )}
+                          <div className="rounded-xl border border-slate-100 p-3">
+                            <div className="flex justify-between gap-2">
+                              <p className="truncate text-xs font-bold">
+                                {log.subject}
+                              </p>
+                              <Badge
+                                tone={
+                                  log.status === "sent"
+                                    ? "green"
+                                    : log.status === "failed"
+                                      ? "red"
+                                      : "amber"
+                                }
+                              >
+                                {log.status}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 truncate text-[10px] text-slate-500">
+                              {log.recipient} · {dateLabel(log.createdAt)}
+                            </p>
+                            {isSuper.data && (
+                              <button
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      "Supprimer ce journal e-mail ?"
+                                    )
+                                  )
+                                    deleteEmailLog.mutate({ id: log.id });
+                                }}
+                                className="mt-2 text-[10px] font-bold text-rose-700"
+                              >
+                                Supprimer le journal
+                              </button>
+                            )}
+                            {log.error && (
+                              <p className="mt-2 text-[10px] text-rose-600">
+                                {log.error}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}
@@ -1845,10 +2250,20 @@ export default function AdminConsole() {
                 <IntegrationCard
                   icon={Cloud}
                   title="Base de données"
-              state={
-                integrations.data?.database.connected ? "ready" : integrations.data?.database.configured ? "warning" : "missing"
-              }
-              detail={integrations.data?.database.connected ? "DATABASE_URL · MySQL/TiDB connecté" : integrations.data?.database.configured ? "URL configurée mais ping SQL échoué" : "DATABASE_URL absent"}
+                  state={
+                    integrations.data?.database.connected
+                      ? "ready"
+                      : integrations.data?.database.configured
+                        ? "warning"
+                        : "missing"
+                  }
+                  detail={
+                    integrations.data?.database.connected
+                      ? "DATABASE_URL · MySQL/TiDB connecté"
+                      : integrations.data?.database.configured
+                        ? "URL configurée mais ping SQL échoué"
+                        : "DATABASE_URL absent"
+                  }
                   note="La base doit être accessible au service Render et contenir les migrations jusqu’à 0006."
                 />
                 <IntegrationCard
@@ -2072,8 +2487,23 @@ function UsersTable({
               <span className="text-[10px] text-slate-400">Protégé</span>
             ) : (
               <div className="flex gap-2">
-                <button onClick={() => setRole(user.email!, user.role === "admin" ? "user" : "admin")} className="h-8 rounded-lg border border-slate-200 px-2 text-[10px] font-bold hover:bg-slate-50">{user.role === "admin" ? "Révoquer" : "Promouvoir"}</button>
-                <button onClick={() => onDelete(user.id, user.email)} className="h-8 rounded-lg border border-rose-200 px-2 text-[10px] font-bold text-rose-700 hover:bg-rose-50">Supprimer</button>
+                <button
+                  onClick={() =>
+                    setRole(
+                      user.email!,
+                      user.role === "admin" ? "user" : "admin"
+                    )
+                  }
+                  className="h-8 rounded-lg border border-slate-200 px-2 text-[10px] font-bold hover:bg-slate-50"
+                >
+                  {user.role === "admin" ? "Révoquer" : "Promouvoir"}
+                </button>
+                <button
+                  onClick={() => onDelete(user.id, user.email)}
+                  className="h-8 rounded-lg border border-rose-200 px-2 text-[10px] font-bold text-rose-700 hover:bg-rose-50"
+                >
+                  Supprimer
+                </button>
               </div>
             )}
           </div>

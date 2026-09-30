@@ -1,4 +1,5 @@
 import type { Locale } from "./siteData";
+import { readLocalStorage } from "./safeStorage";
 
 export type SiteCopy = {
   searchPlaceholder: string;
@@ -476,10 +477,7 @@ export const localeOptions: Array<{
 export const isLocale = (value: string | null): value is Locale =>
   Boolean(value && localeOptions.some(option => option.code === value));
 export const detectLocale = (): Locale => {
-  const saved =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("icx-locale")
-      : null;
+  const saved = readLocalStorage("icx-locale");
   if (isLocale(saved)) return saved;
   return "fr";
 };

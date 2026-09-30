@@ -71,6 +71,11 @@ import {
 } from "@/lib/siteData";
 import { detectLocale, isLocale, localeOptions, siteCopy } from "@/lib/i18n";
 import {
+  readLocalStorage,
+  removeLocalStorage,
+  writeLocalStorage,
+} from "@/lib/safeStorage";
+import {
   CountryField,
   PhoneCodeField,
   callingCodeForCountry,
@@ -1760,12 +1765,12 @@ function ServiceWorkflow({
   const utils = trpc.useUtils();
   const draftKey = `icx-draft-${service.slug}-${need}`;
   const [draftSaved, setDraftSaved] = useState(() =>
-    Boolean(localStorage.getItem(draftKey))
+    Boolean(readLocalStorage(draftKey))
   );
   const [scheduledAt, setScheduledAt] = useState("");
   const submit = trpc.requests.create.useMutation({
     onSuccess: async result => {
-      localStorage.removeItem(draftKey);
+      removeLocalStorage(draftKey);
       await Promise.all([
         utils.requests.mine.invalidate(),
         utils.requests.documents.invalidate(),
@@ -1871,7 +1876,7 @@ function ServiceWorkflow({
     }
   };
   const saveDraft = () => {
-    localStorage.setItem(
+    const saved = writeLocalStorage(
       draftKey,
       JSON.stringify({
         answer,
@@ -1883,11 +1888,15 @@ function ServiceWorkflow({
         scheduledAt,
       })
     );
-    setDraftSaved(true);
-    toast.success("Brouillon enregistré.");
+    if (saved) {
+      setDraftSaved(true);
+      toast.success("Brouillon enregistré.");
+    } else {
+      toast.error("Le stockage local est indisponible sur cet appareil.");
+    }
   };
   const cancelDraft = () => {
-    localStorage.removeItem(draftKey);
+    removeLocalStorage(draftKey);
     setDraftSaved(false);
     setMessage("");
     setAttachments([]);
@@ -1902,7 +1911,7 @@ function ServiceWorkflow({
       save.mutate({ serviceKey: service.slug, need, step, answers: answer });
   }, [step, answer, need, service.slug, user?.id]);
   useEffect(() => {
-    const raw = localStorage.getItem(draftKey);
+    const raw = readLocalStorage(draftKey);
     if (raw)
       try {
         const d = JSON.parse(raw);
@@ -1925,7 +1934,7 @@ function ServiceWorkflow({
         setAttachments(d.attachments || []);
         setScheduledAt(d.scheduledAt || "");
       } catch {
-        localStorage.removeItem(draftKey);
+        removeLocalStorage(draftKey);
       }
   }, [draftKey]);
   return (
@@ -2983,24 +2992,23 @@ function ServicePage({
   const [activeTab, setActiveTab] = useState(view.tabs[0]);
   const resumeKey = `icx-workflow-${service.slug}`;
   const [selectedNeed, setSelectedNeed] = useState<string | null>(() =>
-    localStorage.getItem(`${resumeKey}-need`)
+    readLocalStorage(`${resumeKey}-need`)
   );
   const [workflowStep, setWorkflowStep] = useState<
     "detail" | "assessment" | "auth"
-  >(
-    () =>
-      (localStorage.getItem(`${resumeKey}-step`) as
-        | "detail"
-        | "assessment"
-        | "auth") || "detail"
-  );
+  >(() => {
+    const savedStep = readLocalStorage(`${resumeKey}-step`);
+    return savedStep === "assessment" || savedStep === "auth"
+      ? savedStep
+      : "detail";
+  });
   useEffect(() => {
     setActiveTab(view.tabs[0]);
   }, [locale, service.slug]);
   useEffect(() => {
-    if (selectedNeed) localStorage.setItem(`${resumeKey}-need`, selectedNeed);
-    else localStorage.removeItem(`${resumeKey}-need`);
-    localStorage.setItem(`${resumeKey}-step`, workflowStep);
+    if (selectedNeed) writeLocalStorage(`${resumeKey}-need`, selectedNeed);
+    else removeLocalStorage(`${resumeKey}-need`);
+    writeLocalStorage(`${resumeKey}-step`, workflowStep);
   }, [resumeKey, selectedNeed, workflowStep]);
   const Icon = service.icon;
   const dossiers = view.outcomes.map((outcome, index) => ({
@@ -5590,11 +5598,17 @@ function PartnershipDialog({
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    localStorage.setItem(
+                    const saved = writeLocalStorage(
                       partnerDraftKey,
                       JSON.stringify({ form, partnerFiles, partnerScheduledAt })
                     );
-                    toast.success("Brouillon partenaire enregistré.");
+                    if (saved) {
+                      toast.success("Brouillon partenaire enregistré.");
+                    } else {
+                      toast.error(
+                        "Le stockage local est indisponible sur cet appareil."
+                      );
+                    }
                   }}
                 >
                   Mettre en attente
@@ -6116,7 +6130,7 @@ export default function Home() {
   const updateLocale = (next: Locale) => {
     if (!isLocale(next)) return;
     setLocale(next);
-    localStorage.setItem("icx-locale", next);
+    writeLocalStorage("icx-locale", next);
     document.documentElement.dir = next === "ar" ? "rtl" : "ltr";
     document.documentElement.lang = next;
   };

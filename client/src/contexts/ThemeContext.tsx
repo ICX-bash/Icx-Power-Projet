@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { readLocalStorage, writeLocalStorage } from "@/lib/safeStorage";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -24,16 +25,21 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (switchable) {
-      const stored = localStorage.getItem("theme");
-      return (stored as Theme) || defaultTheme;
+      const stored = readLocalStorage("theme");
+      return stored === "light" || stored === "dark" || stored === "system"
+        ? stored
+        : defaultTheme;
     }
     return defaultTheme;
   });
 
   useEffect(() => {
     const root = document.documentElement;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const effectiveTheme = theme === "system" ? (prefersDark ? "dark" : "light") : theme;
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
+    const effectiveTheme =
+      theme === "system" ? (prefersDark ? "dark" : "light") : theme;
     if (effectiveTheme === "dark") {
       root.classList.add("dark");
     } else {
@@ -41,7 +47,7 @@ export function ThemeProvider({
     }
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      writeLocalStorage("theme", theme);
     }
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const syncSystemTheme = () => {
@@ -53,7 +59,10 @@ export function ThemeProvider({
   }, [theme, switchable]);
 
   const toggleTheme = switchable
-    ? () => setTheme(prev => (prev === "light" ? "dark" : prev === "dark" ? "system" : "light"))
+    ? () =>
+        setTheme(prev =>
+          prev === "light" ? "dark" : prev === "dark" ? "system" : "light"
+        )
     : undefined;
 
   return (

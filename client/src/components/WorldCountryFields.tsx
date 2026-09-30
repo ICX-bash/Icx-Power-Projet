@@ -24,6 +24,15 @@ function localizedName(country: CountryRow, locale: Locale) {
   }
 }
 
+export function getLocalizedCountryOptions(locale: Locale) {
+  return allCountries
+    .map(country => ({
+      code: country.code,
+      name: localizedName(country, locale),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale));
+}
+
 function normalize(value: string) {
   return value.trim().toLocaleLowerCase();
 }

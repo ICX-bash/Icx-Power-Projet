@@ -61,6 +61,7 @@ import {
   PhoneCodeField,
   callingCodeForCountry,
   countryIsoCodeForName,
+  getLocalizedCountryOptions,
 } from "@/components/WorldCountryFields";
 
 const serviceBySlug = Object.fromEntries(
@@ -599,10 +600,10 @@ function Footer({
   }[locale];
   return (
     <footer className="border-t border-border bg-[#1b2420] text-slate-300">
-      <div className="container grid gap-12 py-14 md:grid-cols-[1.4fr_1fr_1fr_1.15fr]">
+      <div className="mx-auto grid w-full grid-cols-1 gap-10 px-4 py-12 sm:grid-cols-2 sm:px-6 lg:px-10 xl:grid-cols-[1.15fr_1fr_1.35fr] xl:gap-14 xl:px-16">
         <div>
           <BrandMark />
-          <p className="mt-5 max-w-xs text-sm leading-6 text-slate-400">
+          <p className="mt-5 max-w-md text-sm leading-6 text-slate-400">
             {copy.platformA}
           </p>
           <div className="mt-5 flex gap-2">
@@ -686,7 +687,7 @@ function Footer({
           </div>
         </div>
       </div>
-      <div className="container flex flex-col gap-2 border-t border-slate-800 py-5 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto flex w-full flex-col gap-2 border-t border-slate-800 px-4 py-5 text-xs text-slate-500 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-10 xl:px-16">
         <span>{footerLabels[3]}</span>
         <span>{footerLabels[4]}</span>
       </div>
@@ -3193,6 +3194,75 @@ function ServicePage({
   );
 }
 
+const studyFilterLabels: Record<
+  Locale,
+  {
+    country: string;
+    searchCountry: string;
+    noCountryMatch: string;
+    countryCount: string;
+    level: string;
+    view: string;
+  }
+> = {
+  fr: {
+    country: "Pays d’étude",
+    searchCountry: "Rechercher un pays",
+    noCountryMatch: "Aucun pays ne correspond à cette recherche.",
+    countryCount: "Pays répertoriés",
+    level: "Niveau d’études",
+    view: "Afficher les programmes ou les universités",
+  },
+  en: {
+    country: "Study country",
+    searchCountry: "Search countries",
+    noCountryMatch: "No countries match this search.",
+    countryCount: "Countries listed",
+    level: "Study level",
+    view: "Show programmes or universities",
+  },
+  ro: {
+    country: "Țara de studiu",
+    searchCountry: "Caută o țară",
+    noCountryMatch: "Nicio țară nu corespunde căutării.",
+    countryCount: "Țări în listă",
+    level: "Nivel de studiu",
+    view: "Afișează programe sau universități",
+  },
+  pl: {
+    country: "Kraj studiów",
+    searchCountry: "Szukaj kraju",
+    noCountryMatch: "Brak krajów pasujących do wyszukiwania.",
+    countryCount: "Kraje na liście",
+    level: "Poziom studiów",
+    view: "Pokaż programy lub uniwersytety",
+  },
+  ar: {
+    country: "بلد الدراسة",
+    searchCountry: "ابحث عن بلد",
+    noCountryMatch: "لا توجد دولة تطابق هذا البحث.",
+    countryCount: "دولة في القائمة",
+    level: "المستوى الدراسي",
+    view: "عرض البرامج أو الجامعات",
+  },
+  zh: {
+    country: "留学国家",
+    searchCountry: "搜索国家",
+    noCountryMatch: "没有符合此搜索条件的国家。",
+    countryCount: "个国家/地区",
+    level: "学习层次",
+    view: "显示项目或大学",
+  },
+};
+
+function normalizeCountrySearch(value: string, locale: Locale) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase(locale)
+    .trim();
+}
+
 function StudiesPage({
   locale,
   setLocale,
@@ -3203,8 +3273,10 @@ function StudiesPage({
   setLocation: (path: string) => void;
 }) {
   const copy = siteCopy[locale];
-  const [country, setCountry] = useState("Tous les pays");
-  const [level, setLevel] = useState("Tous les niveaux");
+  const filterLabels = studyFilterLabels[locale];
+  const [countryCode, setCountryCode] = useState("");
+  const [countryQuery, setCountryQuery] = useState("");
+  const [level, setLevel] = useState("");
   const [query, setQuery] = useState("");
   const [catalogView, setCatalogView] = useState<"programmes" | "universites">(
     "programmes"
@@ -3214,21 +3286,29 @@ function StudiesPage({
   const [studyStep, setStudyStep] = useState<"detail" | "assessment" | "auth">(
     "auth"
   );
+  const studyCountryOptions = useMemo(
+    () => getLocalizedCountryOptions(locale),
+    [locale]
+  );
+  const visibleCountryOptions = useMemo(() => {
+    const normalizedQuery = normalizeCountrySearch(countryQuery, locale);
+    if (!normalizedQuery) return studyCountryOptions;
+    return studyCountryOptions.filter(option =>
+      normalizeCountrySearch(option.name, locale).includes(normalizedQuery)
+    );
+  }, [countryQuery, locale, studyCountryOptions]);
   const filtered = useMemo(
     () =>
       programs.filter(
         program =>
-          (country === "Tous les pays" ||
-            program.country === country ||
-            (countryIsoCodeForName(program.country, locale) &&
-              countryIsoCodeForName(program.country, locale) ===
-                countryIsoCodeForName(country, locale))) &&
-          (level === "Tous les niveaux" || program.level === level) &&
+          (!countryCode ||
+            countryIsoCodeForName(program.country, locale) === countryCode) &&
+          (!level || program.level === level) &&
           `${program.university} ${program.field} ${program.city}`
             .toLowerCase()
             .includes(query.toLowerCase())
       ),
-    [country, level, query, locale]
+    [countryCode, level, query, locale]
   );
   const universities = useMemo(
     () =>
@@ -3267,9 +3347,11 @@ function StudiesPage({
                 </div>
                 <div className="mt-5 grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-xl bg-muted p-3">
-                    <p className="text-xl font-semibold">07</p>
+                    <p className="text-xl font-semibold">
+                      {studyCountryOptions.length}
+                    </p>
                     <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {copy.allCountries}
+                      {filterLabels.countryCount}
                     </p>
                   </div>
                   <div className="rounded-xl bg-muted p-3">
@@ -3291,88 +3373,105 @@ function StudiesPage({
         </section>
         <section className="container py-12 md:py-16">
           <div className="rounded-3xl border border-border bg-card p-4 shadow-sm md:p-6">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="relative flex-1">
+            <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(16rem,1.4fr)_minmax(15rem,1fr)_minmax(12rem,1fr)_minmax(10rem,0.75fr)_auto]">
+              <div className="relative min-w-0">
                 <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   placeholder={copy.searchStudies}
+                  aria-label={copy.searchStudies}
                   className="h-12 w-full rounded-xl border border-input bg-background pl-11 pr-4 text-sm outline-none ring-offset-background transition focus-visible:ring-2 focus-visible:ring-ring"
                 />
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex">
+              <div className="min-w-0 space-y-2">
+                <label
+                  htmlFor="study-country-search"
+                  className="block text-sm font-medium"
+                >
+                  {filterLabels.searchCountry}
+                </label>
+                <input
+                  id="study-country-search"
+                  type="search"
+                  value={countryQuery}
+                  onChange={event => {
+                    setCountryQuery(event.target.value);
+                    setCountryCode("");
+                  }}
+                  placeholder={filterLabels.searchCountry}
+                  autoComplete="off"
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <label
+                  htmlFor="study-country-filter"
+                  className="block text-sm font-medium"
+                >
+                  {filterLabels.country}
+                </label>
                 <select
+                  id="study-country-filter"
+                  value={countryCode}
+                  onChange={event => setCountryCode(event.target.value)}
+                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="">{copy.allCountries}</option>
+                  {visibleCountryOptions.map(option => (
+                    <option key={option.code} value={option.code}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
+                {countryQuery && visibleCountryOptions.length === 0 && (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {filterLabels.noCountryMatch}
+                  </p>
+                )}
+              </div>
+              <label className="block min-w-0 text-sm font-medium">
+                <span className="mb-2 block">{filterLabels.view}</span>
+                <select
+                  aria-label={filterLabels.view}
                   value={catalogView}
                   onChange={event =>
                     setCatalogView(
                       event.target.value as "programmes" | "universites"
                     )
                   }
-                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none"
+                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="universites">{copy.universities}</option>
                   <option value="programmes">{copy.programmes}</option>
                 </select>
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <Globe2 className="size-4 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="Filtre pays des programmes"
-                    value={
-                      country === "Tous les pays"
-                        ? "Tous les pays"
-                        : "pays-saisi"
-                    }
-                    onChange={event => {
-                      if (event.target.value === "Tous les pays")
-                        setCountry("Tous les pays");
-                    }}
-                    className="h-12 rounded-xl border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="Tous les pays">{copy.allCountries}</option>
-                    <option value="pays-saisi">Pays choisi</option>
-                  </select>
-                  {country !== "Tous les pays" && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCountry("Tous les pays")}
-                    >
-                      ×
-                    </Button>
-                  )}
-                  <CountryField
-                    value={country === "Tous les pays" ? "" : country}
-                    onChange={setCountry}
-                    locale={locale}
-                    placeholder="Tous les pays ou saisir…"
-                    className="min-w-0 flex-1"
-                  />
-                </div>
+              </label>
+              <label className="block min-w-0 text-sm font-medium">
+                <span className="mb-2 block">{filterLabels.level}</span>
                 <select
+                  aria-label={copy.allLevels}
                   value={level}
                   onChange={event => setLevel(event.target.value)}
-                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm outline-none"
+                  className="h-12 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <option>{copy.allLevels}</option>
+                  <option value="">{copy.allLevels}</option>
                   <option>Bachelor</option>
                   <option>Master</option>
                   <option>Doctorat</option>
                 </select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    setCountry("Tous les pays");
-                    setLevel("Tous les niveaux");
-                    setQuery("");
-                  }}
-                  aria-label={copy.reset}
-                >
-                  <Filter />
-                </Button>
-              </div>
+              </label>
+              <Button
+                variant="outline"
+                className="h-12 w-full self-end gap-2 sm:col-span-2 xl:col-span-1 xl:w-auto"
+                onClick={() => {
+                  setCountryCode("");
+                  setCountryQuery("");
+                  setLevel("");
+                  setQuery("");
+                }}
+                aria-label={copy.reset}
+              >
+                <Filter />
+                {copy.reset}
+              </Button>
             </div>
           </div>
           <div className="mt-10 flex flex-col justify-between gap-4 md:flex-row md:items-center">

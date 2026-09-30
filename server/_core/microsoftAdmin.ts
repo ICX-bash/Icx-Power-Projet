@@ -11,6 +11,22 @@ const OAUTH_STATE_COOKIE = "icx_ms_oauth_state";
 const OAUTH_SCOPES = ["openid", "profile", "email", "offline_access", "User.Read", "Mail.ReadWrite", "Mail.Send"];
 const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
 
+export function normalizeMicrosoftEmail(value: unknown): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+export function microsoftIdentityEmails(
+  profile: { mail?: string; userPrincipalName?: string },
+  claims: { preferred_username?: unknown; email?: unknown },
+): string[] {
+  return Array.from(new Set([
+    normalizeMicrosoftEmail(profile.mail),
+    normalizeMicrosoftEmail(profile.userPrincipalName),
+    normalizeMicrosoftEmail(claims.preferred_username),
+    normalizeMicrosoftEmail(claims.email),
+  ].filter(Boolean)));
+}
+
 function tenantName() {
   const tenant = process.env.MICROSOFT_TENANT_ID?.trim() || "consumers";
   if (!/^(common|consumers|organizations|[0-9a-fA-F-]{36})$/.test(tenant)) {
@@ -117,6 +133,7 @@ export function registerMicrosoftAdminAuthRoutes(app: Express) {
       authorize.searchParams.set("code_challenge", challenge);
       authorize.searchParams.set("code_challenge_method", "S256");
       authorize.searchParams.set("prompt", "select_account");
+      authorize.searchParams.set("login_hint", ENV.superAdminEmail);
       return res.redirect(302, authorize.toString());
     } catch (error) {
       console.error("[Admin OAuth] Start failed:", error instanceof Error ? error.message : "unknown error");
@@ -165,7 +182,11 @@ export function registerMicrosoftAdminAuthRoutes(app: Express) {
         algorithms: ["RS256"], audience: config.clientId,
       });
       const issuer = typeof payload.iss === "string" ? payload.iss : "";
-      if (!issuer.startsWith("https://login.microsoftonline.com/") || !issuer.endsWith("/v2.0") || payload.nonce !== stateData.nonce) {
+      const tenantId = typeof payload.tid === "string" ? payload.tid : "";
+      const expectedIssuer = config.tenant === "consumers"
+        ? "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+        : `https://login.microsoftonline.com/${tenantId || config.tenant}/v2.0`;
+      if (issuer !== expectedIssuer || payload.nonce !== stateData.nonce) {
         return safeAuthError(res, "invalid_identity_token");
       }
 
@@ -175,10 +196,14 @@ export function registerMicrosoftAdminAuthRoutes(app: Express) {
       });
       if (!profileResponse.ok) return safeAuthError(res, "graph_profile");
       const profile = await profileResponse.json() as { id?: string; displayName?: string; mail?: string; userPrincipalName?: string };
-      const email = (profile.mail || profile.userPrincipalName || (typeof payload.preferred_username === "string" ? payload.preferred_username : "") || (typeof payload.email === "string" ? payload.email : "")).trim().toLowerCase();
-      if (!profile.id || !email || email !== ENV.superAdminEmail) return safeAuthError(res, "not_authorized");
-      const tenantId = typeof payload.tid === "string" ? payload.tid : config.tenant;
-      const openId = "microsoft:" + createHash("sha256").update(`${tenantId}:${profile.id}`).digest("base64url");
+      const identityEmails = microsoftIdentityEmails(profile, payload as { preferred_username?: unknown; email?: unknown });
+      // Outlook.com may return an alias in `mail` and the primary sign-in
+      // name in `userPrincipalName` (or the reverse). Compare every claim,
+      // then persist the configured address as the canonical admin identity.
+      if (!profile.id || !identityEmails.includes(ENV.superAdminEmail)) return safeAuthError(res, "not_authorized");
+      const email = ENV.superAdminEmail;
+      const accountTenantId = tenantId || config.tenant;
+      const openId = "microsoft:" + createHash("sha256").update(`${accountTenantId}:${profile.id}`).digest("base64url");
       await upsertUser({
         openId,
         name: profile.displayName || email,

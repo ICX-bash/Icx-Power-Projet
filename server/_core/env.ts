@@ -4,6 +4,13 @@ const openAiApiBase = (process.env.OPENAI_API_BASE ?? "").trim();
 const openAiApiKey = (process.env.OPENAI_API_KEY ?? "").trim();
 const geminiApiKey = (process.env.GEMINI_API_KEY ?? "").trim();
 const geminiModel = (process.env.GEMINI_MODEL ?? "gemini-3.8-flash").trim();
+const aiPreferredProvider =
+  (process.env.AI_PREFERRED_PROVIDER ?? "gemini").trim().toLowerCase() ===
+  "gemini"
+    ? "gemini"
+    : "llm";
+const aiEnableFallback =
+  (process.env.AI_ENABLE_FALLBACK ?? "false").trim().toLowerCase() !== "false";
 const isUsableApiKey = (value: string) =>
   Boolean(value) && !/^(REMPLACEZ|VOTRE_|YOUR_|<)/i.test(value);
 const useForgeForLlm = isUsableApiKey(forgeApiKey);
@@ -38,4 +45,6 @@ export const ENV = {
   // Optional direct Google AI Studio fallback. This secret is server-only.
   geminiApiKey: isUsableApiKey(geminiApiKey) ? geminiApiKey : "",
   geminiModel,
+  aiPreferredProvider,
+  aiEnableFallback,
 };

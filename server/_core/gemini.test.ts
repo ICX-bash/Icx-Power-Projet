@@ -83,4 +83,60 @@ describe("invokeGeminiChat", () => {
       })
     ).rejects.toThrow("Gemini API returned no text content");
   });
+
+  it("retries one transient 503 before returning a successful answer", async () => {
+    ENV.geminiApiKey = "test-key";
+    const fetchMock = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              { content: { parts: [{ text: "Réponse après reprise" }] } },
+            ],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+    );
+    fetchMock
+      .mockImplementationOnce(
+        async () => new Response("upstream unavailable", { status: 503 })
+      )
+      .mockImplementationOnce(
+        async () =>
+          new Response(
+            JSON.stringify({
+              candidates: [
+                { content: { parts: [{ text: "Réponse après reprise" }] } },
+              ],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const answer = await invokeGeminiChat({
+      systemPrompt: "system",
+      messages: [{ role: "user", content: "test" }],
+    });
+
+    expect(answer).toBe("Réponse après reprise");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a 429 quota response", async () => {
+    ENV.geminiApiKey = "test-key";
+    const fetchMock = vi.fn(
+      async (_url: string | URL | Request, _init?: RequestInit) =>
+        new Response("quota exhausted", { status: 429 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      invokeGeminiChat({
+        systemPrompt: "system",
+        messages: [{ role: "user", content: "test" }],
+      })
+    ).rejects.toThrow("Gemini API request failed with status 429");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });

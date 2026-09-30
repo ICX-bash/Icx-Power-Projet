@@ -5,6 +5,56 @@ export type GeminiChatMessage = {
   content: string;
 };
 
+const RETRYABLE_GEMINI_STATUSES = new Set([408, 425, 500, 502, 503, 504]);
+const GEMINI_MAX_ATTEMPTS = 2;
+const GEMINI_RETRY_DELAY_MS = 400;
+const GEMINI_REQUEST_TIMEOUT_MS = 20_000;
+
+const sleep = (ms: number) =>
+  new Promise<void>(resolve => setTimeout(resolve, ms));
+
+async function requestGemini(
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  for (let attempt = 1; attempt <= GEMINI_MAX_ATTEMPTS; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(GEMINI_REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      if (attempt === GEMINI_MAX_ATTEMPTS) {
+        throw new Error("Gemini API network request failed after retry");
+      }
+      console.warn("[ai.chat] Gemini network failure; retrying once");
+      await sleep(GEMINI_RETRY_DELAY_MS);
+      continue;
+    }
+
+    if (
+      response.ok ||
+      attempt === GEMINI_MAX_ATTEMPTS ||
+      !RETRYABLE_GEMINI_STATUSES.has(response.status)
+    ) {
+      return response;
+    }
+
+    console.warn("[ai.chat] Gemini transient upstream status; retrying once", {
+      status: response.status,
+    });
+    try {
+      await response.body?.cancel();
+    } catch {
+      // The response body may already have been consumed or settled.
+    }
+    await sleep(GEMINI_RETRY_DELAY_MS);
+  }
+
+  throw new Error("Gemini API request failed after exhausting retries");
+}
+
 export async function invokeGeminiChat(input: {
   systemPrompt: string;
   messages: GeminiChatMessage[];
@@ -31,7 +81,7 @@ export async function invokeGeminiChat(input: {
     throw new Error("Gemini chat requires at least one user message");
   }
 
-  const response = await fetch(
+  const response = await requestGemini(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: "POST",
@@ -49,21 +99,24 @@ export async function invokeGeminiChat(input: {
           maxOutputTokens: input.maxOutputTokens ?? 1200,
         },
       }),
-      signal: AbortSignal.timeout(30_000),
     }
   );
 
   if (!response.ok) {
-    // Keep provider details out of the public response and avoid logging the
-    // user's conversation. The status is sufficient for server-side diagnosis.
     throw new Error(`Gemini API request failed with status ${response.status}`);
   }
 
-  const payload = (await response.json()) as {
+  let payload: {
     candidates?: Array<{
       content?: { parts?: Array<{ text?: string }> };
     }>;
   };
+  try {
+    payload = (await response.json()) as typeof payload;
+  } catch {
+    throw new Error("Gemini API returned invalid JSON");
+  }
+
   const answer = payload.candidates?.[0]?.content?.parts
     ?.map(part => part.text ?? "")
     .join("")

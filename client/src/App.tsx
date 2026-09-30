@@ -5,6 +5,7 @@ import { Route, Switch } from "wouter";
 import { Link, useLocation } from "wouter";
 import { MessageCircle, Sparkles } from "lucide-react";
 import { lazy, Suspense } from "react";
+import BackToTopButton from "./components/BackToTopButton";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -56,6 +57,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <BackToTopButton />
           <AssistantBubble />
         </TooltipProvider>
       </ThemeProvider>
@@ -81,7 +83,7 @@ function AssistantBubble() {
           ICX Intelligence
         </span>
         <span className="mt-0.5 block truncate text-[10px] text-slate-400">
-          Assistant disponible
+          Ouvrir l’assistant
         </span>
       </span>
       <MessageCircle className="ml-auto hidden size-4 text-amber-200 sm:block" />

@@ -29,22 +29,22 @@ La connexion client n’a besoin ni de `VITE_APP_ID`, ni de `VITE_OAUTH_PORTAL_U
 ## Variables principales
 
 - **Base et sessions** : `DATABASE_URL`, `DATABASE_SSL`, `JWT_SECRET`, `NEXT_PUBLIC_SITE_URL`.
-- **Assistant IA** : GPT-5 est essayé en premier avec les identifiants serveur Manus Forge (`BUILT_IN_FORGE_API_KEY`, avec l’URL Forge si elle est personnalisée) ou OpenAI-compatible (`OPENAI_API_KEY` et éventuellement `OPENAI_API_BASE`). Si cette requête échoue, l’application peut basculer vers Gemini via `GEMINI_API_KEY`; Gemini seul suffit aussi si aucune clé primaire n’est configurée. Vérifiez `/healthz` : `assistantReady` doit être `true`.
+- **Assistant IA** : le mode par défaut choisi est Gemini seul : `AI_PREFERRED_PROVIDER=gemini`, `AI_ENABLE_FALLBACK=false`. Il n’appelle pas un fournisseur secondaire pouvant être payant; si Gemini manque ou atteint son quota, l’assistant renvoie une indisponibilité explicite. `/healthz` indique si le fournisseur sélectionné est configuré, mais ne vérifie pas que son API répond réellement. Pour utiliser un LLM primaire, définissez `AI_PREFERRED_PROVIDER=llm`; n’activez `AI_ENABLE_FALLBACK=true` que si vous acceptez qu’un fournisseur secondaire soit appelé et puisse être facturé.
 - **Console Microsoft admin** : `SUPER_ADMIN_EMAIL`, `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI`, `INTEGRATION_ENCRYPTION_KEY`.
 - **Courriels** : `BREVO_API_KEY`, `BREVO_FROM_NAME`, `BREVO_FROM_EMAIL`, `BREVO_REPLY_TO`.
 - **Fichiers** : `BUILT_IN_FORGE_API_URL`, `BUILT_IN_FORGE_API_KEY`.
 
 Ne commitez jamais de secrets. Les variables `VITE_*` sont intégrées au bundle client; n’y mettez jamais de secret.
 
-Le free tier de l’API Gemini est limité et Google précise que son contenu peut être utilisé pour améliorer ses produits. Ne l’activez pas pour traiter des renseignements personnels ou des dossiers confidentiels sans avoir vérifié les conditions de confidentialité et obtenu les accords nécessaires; une offre payante peut appliquer des conditions différentes.
+L’offre gratuite de l’API Gemini indique actuellement des tokens gratuits, mais les quotas sont variables et la capacité n’est pas garantie. Google précise que les prompts et réponses du niveau gratuit peuvent être utilisés pour améliorer ses produits et examinés par des personnes; n’y envoyez pas de renseignements personnels, sensibles ou confidentiels. Vérifiez les conditions avant de l’utiliser pour les visiteurs du site.
 
 ### Activer le repli gratuit Gemini dans Render
 
-1. Créez une clé depuis [Google AI Studio](https://aistudio.google.com/apikey), en vérifiant les conditions de l’offre gratuite et son traitement des données.
-2. Dans **Render → service ICX → Environment**, ajoutez `GEMINI_API_KEY` avec la clé obtenue et `GEMINI_MODEL` avec `gemini-3.8-flash`. Ne publiez jamais la clé sur GitHub, dans un message ou dans une variable `VITE_*`.
-3. Enregistrez les variables et laissez Render redémarrer/redéployer le service.
-4. Ouvrez `https://VOTRE-DOMAINE/healthz` : `assistantReady` doit afficher `true`. Cela confirme qu’une clé a été configurée, pas que Google ou le fournisseur primaire est joignable à cet instant.
-5. Testez une question non sensible dans l’assistant. Si les deux fournisseurs échouent, consultez les logs Render pour le statut amont, sans copier de secret dans une conversation.
+1. Créez une clé depuis [Google AI Studio](https://aistudio.google.com/apikey), après avoir accepté les conditions de l’offre gratuite et son traitement des données.
+2. Dans **Render → service ICX → Environment**, ajoutez `GEMINI_API_KEY` avec la clé obtenue et `GEMINI_MODEL=gemini-3.8-flash`. Ne publiez jamais la clé sur GitHub, dans un message ou dans une variable `VITE_*`.
+3. Définissez `AI_PREFERRED_PROVIDER=gemini` et `AI_ENABLE_FALLBACK=false` pour utiliser uniquement Gemini gratuit et ne pas déclencher de fournisseur potentiellement payant. Si vous choisissez délibérément un repli, passez `AI_ENABLE_FALLBACK=true` et vérifiez son coût.
+4. Enregistrez les variables et laissez Render redémarrer/redéployer le service. `/healthz` confirme seulement qu’une clé est configurée; cela ne valide pas l’appel au modèle.
+5. Testez avec une question synthétique et non sensible. En cas d’échec, consultez les logs Render pour les statuts fournisseurs, sans copier de secret ni de dossier client dans une conversation.
 
 ## Vérifications locales
 

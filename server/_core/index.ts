@@ -15,12 +15,21 @@ async function startServer() {
   const server = createServer(app);
   app.set("trust proxy", 1);
   // Keep readiness independent from optional database, storage and OAuth integrations.
-  app.get("/healthz", (_req, res) =>
-    res.status(200).json({
+  app.get("/healthz", (_req, res) => {
+    const llmConfigured = Boolean(ENV.llmApiKey.trim());
+    const geminiConfigured = Boolean(ENV.geminiApiKey.trim());
+    const assistantConfigured = Boolean(
+      ENV.aiPreferredProvider === "gemini"
+        ? geminiConfigured || (ENV.aiEnableFallback && llmConfigured)
+        : llmConfigured || (ENV.aiEnableFallback && geminiConfigured)
+    );
+    return res.status(200).json({
       status: "ok",
-      assistantReady: Boolean(ENV.llmApiKey.trim() || ENV.geminiApiKey.trim()),
-    })
-  );
+      assistantReady: assistantConfigured,
+      assistantConfigured,
+      assistantHealth: "configuration-only",
+    });
+  });
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

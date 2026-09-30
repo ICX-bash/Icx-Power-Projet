@@ -1413,40 +1413,49 @@ export const appRouter = router({
         const getAnswer = (content: unknown) =>
           typeof content === "string" && content.trim() ? content : undefined;
 
-        if (ENV.llmApiKey.trim()) {
-          try {
+        const primaryProvider = {
+          name: "Primary LLM",
+          configured: Boolean(ENV.llmApiKey.trim()),
+          run: async () => {
             const result = await invokeLLM({
               model: "gpt-5",
               reasoning: { effort: "medium" },
               maxCompletionTokens: 1200,
               messages: [
-                { role: "system", content: systemPrompt },
+                { role: "system" as const, content: systemPrompt },
                 ...messages,
               ],
             });
             const answer = getAnswer(result.choices[0]?.message?.content);
-            if (answer) return { content: answer };
-            throw new Error("Primary LLM returned an empty answer");
-          } catch (error) {
-            console.warn("[ai.chat] Primary LLM failed; checking fallback", {
-              error:
-                error instanceof Error
-                  ? error.message.slice(0, 200)
-                  : "Unknown error",
-            });
-          }
-        }
-
-        if (ENV.geminiApiKey.trim()) {
-          try {
-            const answer = await invokeGeminiChat({
+            if (!answer)
+              throw new Error("Primary LLM returned an empty answer");
+            return answer;
+          },
+        };
+        const geminiProvider = {
+          name: "Gemini",
+          configured: Boolean(ENV.geminiApiKey.trim()),
+          run: () =>
+            invokeGeminiChat({
               systemPrompt,
               messages,
               maxOutputTokens: 1200,
-            });
-            return { content: answer };
+            }),
+        };
+        const preferredProviders =
+          ENV.aiPreferredProvider === "gemini"
+            ? [geminiProvider, primaryProvider]
+            : [primaryProvider, geminiProvider];
+        const providers = ENV.aiEnableFallback
+          ? preferredProviders
+          : preferredProviders.slice(0, 1);
+
+        for (const provider of providers) {
+          if (!provider.configured) continue;
+          try {
+            return { content: await provider.run() };
           } catch (error) {
-            console.error("[ai.chat] Gemini fallback failed", {
+            console.warn(`[ai.chat] ${provider.name} provider failed`, {
               error:
                 error instanceof Error
                   ? error.message.slice(0, 200)
@@ -1458,6 +1467,8 @@ export const appRouter = router({
         console.error("[ai.chat] No working provider is configured", {
           primaryConfigured: Boolean(ENV.llmApiKey.trim()),
           geminiConfigured: Boolean(ENV.geminiApiKey.trim()),
+          preferredProvider: ENV.aiPreferredProvider,
+          fallbackEnabled: ENV.aiEnableFallback,
         });
         throw new TRPCError({
           code: "SERVICE_UNAVAILABLE",

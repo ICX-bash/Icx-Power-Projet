@@ -24,8 +24,11 @@ const assistantCopy = {
     unavailable:
       "L’assistant est momentanément indisponible. Réessayez ou contactez ICX directement.",
     newChat: "Nouvelle conversation",
-    limits: "{ui.limits}",
-    recommendation: "{ui.recommendation}",
+    limits: "Les limites et les points à confirmer sont signalés clairement",
+    recommendation: "Une recommandation concrète à chaque échange",
+    dataNotice:
+      "Vos messages sont transmis au fournisseur d’IA configuré. Les règles Google varient selon la région : certains usages gratuits peuvent servir à améliorer ses services et être lus par des réviseurs; des clauses différentes s’appliquent dans l’EEE, en Suisse et au Royaume-Uni. Évitez les données personnelles, sensibles ou confidentielles.",
+    dataTerms: "Conditions Google",
     intents: [
       "Études & admissions",
       "Entreprise & stratégie",
@@ -41,6 +44,9 @@ const assistantCopy = {
     newChat: "New conversation",
     limits: "Limits and information to confirm are clearly flagged",
     recommendation: "One concrete recommendation in every exchange",
+    dataNotice:
+      "Your messages are sent to the configured AI provider. Google's data terms vary by region: some free usage may be used to improve its services and read by human reviewers; different clauses apply in the EEA, Switzerland and the UK. Avoid personal, sensitive or confidential information.",
+    dataTerms: "Google terms",
     intents: [
       "Studies & admissions",
       "Business & strategy",
@@ -56,6 +62,9 @@ const assistantCopy = {
     newChat: "Conversație nouă",
     limits: "Limitele și informațiile de confirmat sunt semnalate clar",
     recommendation: "O recomandare concretă la fiecare schimb",
+    dataNotice:
+      "Mesajele sunt trimise furnizorului de inteligență artificială configurat. Regulile Google privind datele diferă în funcție de regiune: unele utilizări gratuite pot fi folosite pentru îmbunătățirea serviciilor și pot fi citite de evaluatori; în SEE, Elveția și Regatul Unit se aplică clauze diferite. Evitați datele personale, sensibile sau confidențiale.",
+    dataTerms: "Condițiile Google",
     intents: [
       "Studii și admitere",
       "Afaceri și strategie",
@@ -72,6 +81,9 @@ const assistantCopy = {
     limits:
       "Ograniczenia i informacje wymagające potwierdzenia są wyraźnie oznaczone",
     recommendation: "Konkretna rekomendacja w każdej rozmowie",
+    dataNotice:
+      "Wiadomości są wysyłane do skonfigurowanego dostawcy AI. Zasady Google dotyczące danych zależą od regionu: niektóre bezpłatne użycia mogą służyć do ulepszania usług i być czytane przez recenzentów; w EOG, Szwajcarii i Wielkiej Brytanii obowiązują inne klauzule. Unikaj danych osobowych, wrażliwych i poufnych.",
+    dataTerms: "Warunki Google",
     intents: [
       "Studia i rekrutacja",
       "Biznes i strategia",
@@ -86,6 +98,9 @@ const assistantCopy = {
     newChat: "محادثة جديدة",
     limits: "يتم توضيح الحدود والمعلومات التي تحتاج إلى تأكيد",
     recommendation: "توصية عملية في كل محادثة",
+    dataNotice:
+      "تُرسل رسائلك إلى مزوّد الذكاء الاصطناعي المُعدّ. تختلف قواعد Google للبيانات حسب المنطقة: قد تُستخدم بعض الاستخدامات المجانية لتحسين الخدمات وقد يقرأها مراجعون؛ وتُطبّق شروط مختلفة في المنطقة الاقتصادية الأوروبية وسويسرا والمملكة المتحدة. تجنّب إدخال معلومات شخصية أو حساسة أو سرية.",
+    dataTerms: "شروط Google",
     intents: [
       "الدراسات والقبول",
       "الأعمال والاستراتيجية",
@@ -99,6 +114,9 @@ const assistantCopy = {
     newChat: "新对话",
     limits: "需要确认的限制和信息会清晰标注",
     recommendation: "每次交流都提供一个具体建议",
+    dataNotice:
+      "您的消息会发送给已配置的 AI 服务商。Google 的数据规则因地区而异：部分免费服务可能使用提示和回复改进服务并由人工审阅；欧洲经济区、瑞士和英国适用不同条款。请避免输入个人、敏感或机密信息。",
+    dataTerms: "Google 条款",
     intents: ["留学与申请", "企业与战略", "采购与贸易", "人力资源与流动"],
   },
 } as const;
@@ -121,7 +139,13 @@ export default function Assistant() {
         ...current,
         { role: "assistant", content: response.content },
       ]),
-    onError: () => toast.error(ui.unavailable),
+    onError: () => {
+      setMessages(current => [
+        ...current,
+        { role: "assistant", content: ui.unavailable },
+      ]);
+      toast.error(ui.unavailable);
+    },
   });
 
   const handleSend = (content: string) => {
@@ -203,6 +227,20 @@ export default function Assistant() {
               <Sparkles className="size-4 text-amber-300" />
               {ui.recommendation}
             </div>
+          </div>
+          <div className="mt-5 rounded-xl border border-amber-200/20 bg-amber-200/[0.06] p-3 text-xs leading-5 text-[#f1dfb7]">
+            <p dir="auto">
+              {ui.dataNotice}{" "}
+              <a
+                href="https://ai.google.dev/gemini-api/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold underline underline-offset-2 hover:text-white"
+              >
+                {ui.dataTerms}
+              </a>
+              .
+            </p>
           </div>
           <div className="mt-7 grid gap-2 sm:grid-cols-2">
             {assistantCopy[locale].intents.map((label, index) => {

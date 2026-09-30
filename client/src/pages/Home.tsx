@@ -754,7 +754,7 @@ function Hero({
             </span>
           </div>
         </div>
-        <div className="relative min-h-[390px] lg:min-h-[470px]">
+        <div className="relative aspect-[4/3] sm:aspect-[16/10] xl:aspect-auto xl:min-h-[470px]">
           <div className="absolute inset-0 overflow-hidden rounded-[2.2rem] border border-white/15 bg-[#27302b] shadow-[0_0_90px_rgba(183,121,31,.22)]">
             <img
               src="/assets/hero-inclusive-entrepreneurs-1600.webp"
@@ -765,7 +765,7 @@ function Hero({
               height={900}
               fetchPriority="high"
               decoding="async"
-              className="h-full w-full object-cover opacity-90"
+              className="h-full w-full object-contain opacity-90 xl:object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-tr from-[#1b2420]/80 via-[#34453b]/15 to-amber-300/10" />
           </div>
